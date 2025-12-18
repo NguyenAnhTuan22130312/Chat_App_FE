@@ -1,46 +1,65 @@
-# Getting Started with Create React App
+# Chat App Project
 
-This project was bootstrapped with [Create React App](https://github.com/facebook/create-react-app).
+> **Note**: Đây là dự án Front-end xây dựng bằng **React + TypeScript**, kết nối Real-time qua Socket API của thầy.
 
-## Available Scripts
+---
 
-In the project directory, you can run:
+## Kiến trúc Dự án (Frontend Structure)
 
-### `npm start`
+Dự án được tổ chức theo mô hình **Component-Based**, phân tách rõ ràng giữa logic giao diện và logic kết nối Socket.
 
-Runs the app in the development mode.\
-Open [http://localhost:3000](http://localhost:3000) to view it in the browser.
+| Thư mục | Chức năng |
+| :--- | :--- |
+| `src/services` | Quản lý kết nối WebSocket tập trung. |
+| `src/components` | Các thành phần nguyên tử (Atomic UI) như Avatar, Message Bubble. |
+| `src/screens` | Chứa các trang lớn: Login, Register, Home Chat. |
+| `src/constants` | Lưu trữ Theme (màu sắc) và các Event Names của Socket. |
 
-The page will reload if you make edits.\
-You will also see any lint errors in the console.
+---
 
-### `npm test`
+##  Tài liệu Socket API 
 
-Launches the test runner in the interactive watch mode.\
-See the section about [running tests](https://facebook.github.io/create-react-app/docs/running-tests) for more information.
+Ứng dụng kết nối tới Server qua URL: `wss://chat.longapp.site/chat/chat`
 
-### `npm run build`
+### Xác thực & Tài khoản
+- `REGISTER`: Đăng ký tài khoản.
+- `LOGIN`: Đăng nhập lần đầu.
+- `RE_LOGIN`: Tự động kết nối lại bằng mã code lưu ở LocalStorage.
+- `LOGOUT`: Thoát hệ thống.
 
-Builds the app for production to the `build` folder.\
-It correctly bundles React in production mode and optimizes the build for the best performance.
+### Chức năng Nhắn tin
+- `SEND_CHAT`: Gửi tin nhắn (Hỗ trợ `type: "people"` và `type: "room"`).
+- `GET_USER_LIST`: Lấy danh sách người dùng để bắt đầu hội thoại.
+- `CHECK_USER`: Kiểm tra thông tin người dùng.
+- `CREATE_ROOM` & `JOIN_ROOM`: Quản lý nhóm chat.
+- `GET_PEOPLE_CHAT_MES`: Tải lịch sử tin nhắn cá nhân.
 
-The build is minified and the filenames include the hashes.\
-Your app is ready to be deployed!
+---
 
-See the section about [deployment](https://facebook.github.io/create-react-app/docs/deployment) for more information.
+## Danh sách Công việc (Roadmap)
 
-### `npm run eject`
+### Giai đoạn 1: Nền tảng
+- [x] Thiết lập Theme & Cấu trúc thư mục.
+- [ ] Xây dựng giao diện Đăng ký / Đăng nhập.
+- [ ] Code Service kết nối Socket (`SocketService.ts`).
 
-**Note: this is a one-way operation. Once you `eject`, you can’t go back!**
+### Giai đoạn 2: Tính năng cốt lõi
+- [ ] Render danh sách bạn bè từ `GET_USER_LIST`.
+- [ ] Gửi/Nhận tin nhắn Text thời gian thực.
+- [ ] Hiển thị lịch sử chat từ API.
 
-If you aren’t satisfied with the build tool and configuration choices, you can `eject` at any time. This command will remove the single build dependency from your project.
+### Giai đoạn 3: Tính năng nâng cao
+- [ ] **Rich Text**: Nhận diện in đậm, in nghiêng, in hoa.
+- [ ] **Media**: Gửi hình ảnh, Video, GIF.
+- [ ] **UI/UX**: Emoji picker, hiệu ứng tin nhắn đang soạn.
 
-Instead, it will copy all the configuration files and the transitive dependencies (webpack, Babel, ESLint, etc) right into your project so you have full control over them. All of the commands except `eject` will still work, but they will point to the copied scripts so you can tweak them. At this point you’re on your own.
+---
 
-You don’t have to ever use `eject`. The curated feature set is suitable for small and middle deployments, and you shouldn’t feel obligated to use this feature. However we understand that this tool wouldn’t be useful if you couldn’t customize it when you are ready for it.
+## Hướng dẫn chạy Project
 
-## Learn More
-
-You can learn more in the [Create React App documentation](https://facebook.github.io/create-react-app/docs/getting-started).
-
-To learn React, check out the [React documentation](https://reactjs.org/).
+1. **Cài đặt thư viện:**
+   ```bash
+   npm install
+Chạy ở chế độ Development:
+```bash
+   npm start
