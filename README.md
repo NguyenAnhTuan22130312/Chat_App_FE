@@ -55,6 +55,11 @@ Dự án được tổ chức theo mô hình **Component-Based**, phân tách r�
 
 ---
 
+URL document tài liệu chia công việc:
+https://docs.google.com/document/d/1RNXI7Ix95NfznnffgJ4L0gRbNhay4-o1n3bbhC3HZhY/edit?tab=t.0
+
+---
+
 ## Hướng dẫn chạy Project
 
 1. **Cài đặt thư viện:**
