@@ -5,6 +5,13 @@ export const THEME = {
       online: '#44b700',        
       error: '#fa3e3e',
       
+      // Login Colors
+      loginBanner: '#000851',      // Navy blue for login banner
+      loginBannerText: '#ffffff',  // White text on banner
+      loginAccent: '#5c6bc0',      // Light blue/purple for decorations
+      loginCircle: 'rgba(255, 255, 255, 0.1)', // Semi-transparent circles
+      loginFormBg: '#ffffff',      // White background for form
+      
       // Light Mode
       light: {
         background: '#ffffff',
