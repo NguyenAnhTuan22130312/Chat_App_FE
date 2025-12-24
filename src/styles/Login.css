@@ -1,0 +1,77 @@
+/* Login Container Responsive Design */
+.login-container {
+  display: flex;
+  width: 100vw;
+  height: 100vh;
+}
+
+/* Hover effect for input fields */
+.login-container input:hover {
+  border-color: #c0c0c0;
+}
+
+.login-container input:focus {
+  border-color: #0084ff;
+}
+
+/* Button hover effect */
+.login-container button:hover {
+  background-color: #000a6f;
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(0, 8, 81, 0.2);
+}
+
+.login-container button:active {
+  transform: translateY(0);
+}
+
+/* Link hover effect */
+.login-container a:hover {
+  text-decoration: underline;
+}
+
+/* Responsive Design */
+@media (max-width: 768px) {
+  .login-container {
+    flex-direction: column;
+  }
+  
+  .login-container > div {
+    width: 100% !important;
+    height: 50vh !important;
+  }
+}
+
+/* Tablet view */
+@media (max-width: 1024px) and (min-width: 769px) {
+  .login-container > div:first-child {
+    width: 40% !important;
+  }
+  
+  .login-container > div:last-child {
+    width: 60% !important;
+  }
+}
+
+/* Animation for decorative elements */
+@keyframes float {
+  0%, 100% {
+    transform: translateY(0px);
+  }
+  50% {
+    transform: translateY(-10px);
+  }
+}
+
+/* Subtle animation for small circles */
+.login-container > div > div {
+  animation: float 6s ease-in-out infinite;
+}
+
+.login-container > div > div:nth-child(odd) {
+  animation-delay: 0.5s;
+}
+
+.login-container > div > div:nth-child(even) {
+  animation-delay: 1s;
+}
