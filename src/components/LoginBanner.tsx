@@ -1,5 +1,5 @@
 import React from 'react';
-import { THEME } from '../../constants/Theme';
+import { THEME } from '../constants/Theme';
 
 const LoginBanner: React.FC = () => {
   const bannerStyle: React.CSSProperties = {

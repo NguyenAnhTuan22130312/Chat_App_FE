@@ -1,6 +1,7 @@
 import React from 'react';
-import LoginBanner from './LoginBanner';
-import './Login.css';
+import LoginBanner from '../components/LoginBanner';
+import LoginForm from '../components/LoginForm';
+import '../styles/Login.css';
 
 const Login: React.FC = () => {
   const containerStyle: React.CSSProperties = {
@@ -13,6 +14,7 @@ const Login: React.FC = () => {
   return (
     <div style={containerStyle} className="login-container">
       <LoginBanner />
+      <LoginForm />
     </div>
   );
 };
