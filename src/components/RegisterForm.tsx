@@ -1,10 +1,21 @@
 import React, { useState } from 'react';
 import { Link } from 'react-router-dom';
 
-const LoginForm: React.FC = () => {
+const RegisterForm: React.FC = () => {
+  const [email, setEmail] = useState('');
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
+
+  // Email icon SVG
+  const EmailIcon = () => (
+    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"></path>
+      <polyline points="22,6 12,13 2,6"></polyline>
+    </svg>
+  );
 
   // User icon SVG
   const UserIcon = () => (
@@ -39,22 +50,49 @@ const LoginForm: React.FC = () => {
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    console.log('Login:', { username, password });
+    
+    // Basic validation
+    if (password !== confirmPassword) {
+      alert('Mật khẩu không khớp!');
+      return;
+    }
+    
+    console.log('Register:', { email, username, password });
   };
 
   return (
     <div className="w-1/2 h-screen flex items-center justify-center bg-gray-50 overflow-hidden">
       <form 
         onSubmit={handleSubmit} 
-        className="w-[420px] bg-white rounded-2xl shadow-lg p-12 relative z-10 animate-fade-in-up"
+        className="w-[440px] bg-white rounded-2xl shadow-lg p-12 relative z-10 animate-fade-in-up"
       >
         <h1 className="text-[38px] font-semibold text-gray-900 mb-2 text-center">
-          Chào Mừng Trở Lại
+          Tạo Tài Khoản
         </h1>
         <p className="text-[17px] text-gray-600 mb-9 text-center">
-          Vui lòng đăng nhập vào tài khoản của bạn
+          Điền thông tin để bắt đầu hành trình
         </p>
         
+        {/* Email Field */}
+        <div className="mb-5">
+          <label className="block text-base font-medium text-gray-700 mb-2">
+            Email
+          </label>
+          <div className="relative flex items-center">
+            <span className="absolute left-3.5 text-gray-400 pointer-events-none z-10 flex items-center">
+              <EmailIcon />
+            </span>
+            <input
+              type="email"
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              className="w-full px-3.5 pl-11 py-3.5 text-base text-gray-700 bg-white border-2 border-gray-300 rounded-lg outline-none transition-all duration-300 ease-in-out focus:border-primary focus:shadow-[0_0_0_3px_rgba(0,132,255,0.1)]"
+              placeholder="Nhập email của bạn"
+              required
+            />
+          </div>
+        </div>
+
         {/* Username Field */}
         <div className="mb-5">
           <label className="block text-base font-medium text-gray-700 mb-2">
@@ -69,7 +107,8 @@ const LoginForm: React.FC = () => {
               value={username}
               onChange={(e) => setUsername(e.target.value)}
               className="w-full px-3.5 pl-11 py-3.5 text-base text-gray-700 bg-white border-2 border-gray-300 rounded-lg outline-none transition-all duration-300 ease-in-out focus:border-primary focus:shadow-[0_0_0_3px_rgba(0,132,255,0.1)]"
-              placeholder="Nhập tên đăng nhập"
+              placeholder="Chọn tên đăng nhập"
+              required
             />
           </div>
         </div>
@@ -88,7 +127,9 @@ const LoginForm: React.FC = () => {
               value={password}
               onChange={(e) => setPassword(e.target.value)}
               className="w-full px-3.5 pl-11 py-3.5 text-base text-gray-700 bg-white border-2 border-gray-300 rounded-lg outline-none transition-all duration-300 ease-in-out focus:border-primary focus:shadow-[0_0_0_3px_rgba(0,132,255,0.1)]"
-              placeholder="Nhập mật khẩu"
+              placeholder="Tạo mật khẩu mạnh"
+              required
+              minLength={6}
             />
             <span 
               onClick={() => setShowPassword(!showPassword)}
@@ -99,32 +140,47 @@ const LoginForm: React.FC = () => {
           </div>
         </div>
 
-        {/* Forgot Password */}
-        <div className="text-right mt-2 mb-7">
-          <button 
-            type="button"
-            onClick={() => alert('Tính năng đang phát triển')}
-            className="text-[15px] text-primary bg-transparent border-none cursor-pointer font-medium transition-opacity duration-200 hover:opacity-70 hover:underline p-0"
-          >
-            Quên mật khẩu?
-          </button>
+        {/* Confirm Password Field */}
+        <div className="mb-7">
+          <label className="block text-base font-medium text-gray-700 mb-2">
+            Xác nhận mật khẩu
+          </label>
+          <div className="relative flex items-center">
+            <span className="absolute left-3.5 text-gray-400 pointer-events-none z-10 flex items-center">
+              <LockIcon />
+            </span>
+            <input
+              type={showConfirmPassword ? 'text' : 'password'}
+              value={confirmPassword}
+              onChange={(e) => setConfirmPassword(e.target.value)}
+              className="w-full px-3.5 pl-11 py-3.5 text-base text-gray-700 bg-white border-2 border-gray-300 rounded-lg outline-none transition-all duration-300 ease-in-out focus:border-primary focus:shadow-[0_0_0_3px_rgba(0,132,255,0.1)]"
+              placeholder="Nhập lại mật khẩu"
+              required
+            />
+            <span 
+              onClick={() => setShowConfirmPassword(!showConfirmPassword)}
+              className="absolute right-3.5 text-gray-400 cursor-pointer transition-colors duration-200 z-10 flex items-center select-none hover:text-primary"
+            >
+              <EyeIcon isOpen={showConfirmPassword} />
+            </span>
+          </div>
         </div>
 
-        {/* Login Button */}
+        {/* Register Button */}
         <button 
           type="submit" 
           className="w-full py-4 text-[17px] font-semibold text-white bg-primary border-none rounded-lg cursor-pointer transition-all duration-300 ease-in-out mb-6 shadow-[0_4px_12px_rgba(0,132,255,0.25)] hover:-translate-y-0.5 hover:shadow-[0_6px_20px_rgba(0,132,255,0.4)] hover:bg-primary-light active:translate-y-0 active:shadow-[0_4px_12px_rgba(0,132,255,0.25)]"
         >
-          Đăng nhập
+          Đăng ký
         </button>
 
-        {/* Sign Up Link */}
+        {/* Login Link */}
         <div className="text-center text-[15px] text-gray-600">
-          Chưa có tài khoản? <Link to="/register" className="text-primary no-underline cursor-pointer font-semibold transition-opacity duration-200 hover:opacity-70 hover:underline">Đăng ký</Link>
+          Đã có tài khoản? <Link to="/login" className="text-primary no-underline cursor-pointer font-semibold transition-opacity duration-200 hover:opacity-70 hover:underline">Đăng nhập</Link>
         </div>
       </form>
     </div>
   );
 };
 
-export default LoginForm;
+export default RegisterForm;
