@@ -1,6 +1,6 @@
 import React from 'react';
 
-const LoginBanner: React.FC = () => {
+const RegisterBanner: React.FC = () => {
   // Small dots
   const Dot = ({ top, left, delay }: { top: string; left: string; delay: number }) => (
     <div 
@@ -26,14 +26,14 @@ const LoginBanner: React.FC = () => {
       {/* Text content */}
       <div className="relative text-center z-10 max-w-[500px] px-10">
         <h1 className="text-[56px] font-semibold text-white m-0 mb-4 tracking-tight">
-          Xin Chào Bạn!
+          Chào Mừng Bạn!
         </h1>
         <p className="text-xl text-white/95 m-0 leading-relaxed">
-          Nhập thông tin cá nhân của bạn và bắt đầu hành trình cùng chúng tôi
+          Tạo tài khoản để trải nghiệm đầy đủ các tính năng của chúng tôi
         </p>
       </div>
     </div>
   );
 };
 
-export default LoginBanner;
+export default RegisterBanner;
