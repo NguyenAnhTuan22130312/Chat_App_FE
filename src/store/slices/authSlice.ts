@@ -14,8 +14,8 @@ interface AuthState {
 
 // State ban đầu khi project khởi động
 const initialState: AuthState = {
-    user: null,
-    isAuthenticated: false,
+    user: localStorage.getItem('username') ? { username: localStorage.getItem('username')! } : null,
+    isAuthenticated: !!localStorage.getItem('reLoginCode'), // True nếu có reLoginCode
     reLoginCode: localStorage.getItem('reLoginCode'),
     loading: false,
     error: null,
