@@ -1,6 +1,6 @@
 import React from 'react';
-import RegisterBanner from '../components/RegisterBanner';
-import RegisterForm from '../components/RegisterForm';
+import RegisterBanner from '../components/auth/RegisterBanner';
+import RegisterForm from '../components/auth/RegisterForm';
 
 const Register: React.FC = () => {
   return (

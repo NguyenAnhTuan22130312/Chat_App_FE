@@ -1,6 +1,6 @@
 import React from 'react';
-import LoginBanner from '../components/LoginBanner';
-import LoginForm from '../components/LoginForm';
+import LoginBanner from '../components/auth/LoginBanner';
+import LoginForm from '../components/auth/LoginForm';
 
 const Login: React.FC = () => {
   return (
