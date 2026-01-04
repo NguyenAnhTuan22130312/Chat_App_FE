@@ -1,25 +1,56 @@
-import React from 'react';
+import React, { useEffect, useRef } from 'react';
 import ChatHeader from './ChatHeader';
 import MessageBubble from './MessageBubble';
 import ChatInput from './ChatInput';
-import { MOCK_MESSAGES } from '../../data/mockData';
-
+import { useAppSelector } from '../../hooks/reduxHooks'; 
+import { socketService } from '../../services/socketService';
 
 export default function ChatWindow() {
+
+  const { user } = useAppSelector((state) => state.auth);
+  const myUsername = user?.username;
+  const { messages, currentPartner } = useAppSelector((state) => state.chat);
+  const messagesEndRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const initChat = async () => {
+      await socketService.connect();
+
+    if (myUsername) {
+       console.log(`Bắt đầu lấy tin nhắn với ${currentPartner}`);
+       socketService.getHistory(currentPartner);
+    }
+  };
+  initChat();
+  }, [currentPartner, myUsername]);
+
+  useEffect(() => {
+    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+  }, [messages]);
+
  return (
    <div className="flex flex-col h-screen bg-white w-full border-l border-gray-300">
      <ChatHeader />
-
-
      <div className="flex-1 overflow-y-auto p-4 flex flex-col space-y-1">
-       {MOCK_MESSAGES.map((msg) => (
-         <MessageBubble
-           key={msg.id}
-           text={msg.text}
-           isMe={msg.isMe}
-           avatar={msg.avatar}
-         />
-       ))}
+     {messages.length === 0 && (
+            <div className="text-center text-gray-400 mt-10">
+                Bắt đầu cuộc trò chuyện với {currentPartner}...
+            </div>
+        )}
+        {messages.map((msg, index) => {
+          const isMe = msg.name === myUsername; 
+          
+          return (
+            <MessageBubble
+              key={index} 
+              text={msg.mes} 
+              isMe={isMe}
+              avatar={!isMe ? "https://i.pravatar.cc/150?u=long" : undefined} 
+            />
+          );
+        })}
+
+      <div ref={messagesEndRef} />
      </div>
 
 

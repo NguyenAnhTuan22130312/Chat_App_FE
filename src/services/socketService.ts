@@ -1,4 +1,5 @@
 import {loginFailure, loginSuccess, registerSuccess} from "../store/slices/authSlice";
+import { addMessage, setMessages } from "../store/slices/chatSlice";
 import {store} from "../store/store";
 
 const SOCKET_URL = 'wss://chat.longapp.site/chat/chat';
@@ -17,6 +18,13 @@ class SocketService {
     if (onMessageReceived) {
       this.messageCallback = onMessageReceived;
     }
+    if (this.socket && this.socket.readyState === WebSocket.OPEN) {
+      return Promise.resolve();
+  }
+
+  if (this.connectionReady) {
+      return this.connectionReady;
+  }
 
     // Tạo Promise để đợi connection
     this.connectionReady = new Promise((resolve) => {
@@ -93,6 +101,22 @@ class SocketService {
               }));
               console.log('Register success');
               break;
+              case "GET_PEOPLE_CHAT_MES":
+                const historyData = data.data;
+                console.log("Server trả về lịch sử chat raw:", historyData);
+                if (Array.isArray(data.data)) {
+                  const sortedMessages = [...historyData].reverse();
+                   store.dispatch(setMessages(data.data));
+                   
+                   console.log("Đã tải lịch sử chat:", data.data.length, "tin nhắn");
+                }
+                break;
+      
+              case "SEND_CHAT":
+                if (data.data) {
+                  store.dispatch(addMessage(data.data));
+                }
+                break;
 
         default:
           // Các event != (chat, vv...)
@@ -101,6 +125,20 @@ class SocketService {
     } else if (status === 'error') {
       // Xử lý error
       const errorMessage = data.mes || 'Có lỗi xảy ra';
+
+      if (errorMessage === 'User not Login') {
+        console.warn('⚠️ Server báo chưa đăng nhập. Đang tự động đăng nhập lại...');
+        
+        const user = localStorage.getItem('username');
+        const code = localStorage.getItem('reLoginCode');
+
+        if (user && code) {
+            this.reLogin(user, code);
+        } else {
+             store.dispatch(loginFailure("Phiên đăng nhập hết hạn"));
+        }
+        return; 
+    }
 
       if (event === 'LOGIN' || event === 'RE_LOGIN' || event === 'REGISTER') {
         store.dispatch(loginFailure(errorMessage));
