@@ -56,17 +56,8 @@ const authSlice = createSlice({
         },
 
         // Đăng ký thành công
-        // Auto chuyển sang trạng thái đã đăng nhập hoặc yêu cầu login
-        registerSuccess: (state, action: PayloadAction<{ user: User; reLoginCode?: string }>) => {
+        registerSuccess: (state) => {
             state.loading = false;
-            state.isAuthenticated = true;
-            state.user = action.payload.user;
-
-            if (action.payload.reLoginCode) {
-                state.reLoginCode = action.payload.reLoginCode;
-                localStorage.setItem('reLoginCode', action.payload.reLoginCode);
-                localStorage.setItem('username', action.payload.user.username);
-            }
             state.error = null;
         },
 

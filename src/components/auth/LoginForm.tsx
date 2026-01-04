@@ -61,7 +61,7 @@ const LoginForm: React.FC = () => {
       )
   );
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
     // Validate input
@@ -75,11 +75,10 @@ const LoginForm: React.FC = () => {
 
     // Gọi socketService để gửi packet LOGIN
     try {
-      socketService.login(username, password);
-      console.log('✅ Login request sent for user:', username);
+      await socketService.login(username, password);
+      console.log('Login request sent for user:', username);
     } catch (err: any) {
-      console.error('❌ Failed to send login request:', err);
-      alert(err.message || 'Không thể kết nối tới server');
+      console.error('Failed to send login request:', err);
     }
   };
 

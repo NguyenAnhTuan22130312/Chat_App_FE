@@ -1,5 +1,5 @@
 import React, {useEffect, useState} from 'react';
-import {Link} from 'react-router-dom';
+import {Link, useNavigate} from 'react-router-dom';
 import {socketService} from "../../services/socketService";
 import {clearError, loginRequest} from "../../store/slices/authSlice";
 import {useAppDispatch, useAppSelector} from "../../hooks/reduxHooks";
@@ -11,7 +11,9 @@ const RegisterForm: React.FC = () => {
     const [confirmPassword, setConfirmPassword] = useState('');
     const [showPassword, setShowPassword] = useState(false);
     const [showConfirmPassword, setShowConfirmPassword] = useState(false);
+    const [registerSuccess, setRegisterSuccess] = useState(false);
 
+    const navigate = useNavigate();
     // Lấy state từ Redux
     const dispatch = useAppDispatch();
     const {loading, error} = useAppSelector((state) => state.auth);
@@ -31,6 +33,25 @@ const RegisterForm: React.FC = () => {
             return () => clearTimeout(timeout);
         }
     }, [error, dispatch]);
+
+    // Listen for register success và navigate to login
+    useEffect(() => {
+        const handleMessage = (data: any) => {
+            if (data.event === 'REGISTER' && data.status === 'success') {
+                setRegisterSuccess(true);
+                // Hiển thị thông báo và chuyển về login sau 2 giây
+                setTimeout(() => {
+                    navigate('/login', { 
+                        state: { 
+                            message: 'Đăng ký thành công! Vui lòng đăng nhập.' 
+                        } 
+                    });
+                }, 2000);
+            }
+        };
+
+        socketService.connect(handleMessage);
+    }, [navigate]);
 
     // Email icon SVG
     const EmailIcon = () => (
@@ -77,7 +98,7 @@ const RegisterForm: React.FC = () => {
         )
     );
 
-    const handleSubmit = (e: React.FormEvent) => {
+    const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
 
         // Basic validation
@@ -96,11 +117,11 @@ const RegisterForm: React.FC = () => {
 
         // Gọi socketService để gửi packet REGISTER
         try {
-            socketService.register(username, password);
-            console.log('✅ Register request sent for user:', username);
+            await socketService.register(username, password);
+            console.log('Register request sent for user:', username);
         } catch (err: any) {
             console.error('Failed to send register request:', err);
-            alert(err.message || 'Không thể kết nối tới server');
+            // Không hiển thị alert nữa, để Redux handle error
         }
     };
 
@@ -114,13 +135,22 @@ const RegisterForm: React.FC = () => {
                     Tạo Tài Khoản
                 </h1>
                 <p className="text-[17px] text-gray-600 mb-9 text-center">
-                    Điền thông tin để bắt đầu hành trình
+                    Điền thông tin tại đây để bắt đầu nhé :))))))
                 </p>
 
                 {/* Error Message */}
                 {error && (
                     <div className="mb-5 p-3 bg-red-50 border border-red-200 rounded-lg">
                         <p className="text-sm text-red-600 text-center">{error}</p>
+                    </div>
+                )}
+
+                {/* Success Message */}
+                {registerSuccess && (
+                    <div className="mb-5 p-3 bg-green-50 border border-green-200 rounded-lg">
+                        <p className="text-sm text-green-600 text-center">
+                            Đăng ký thành công! Đang chuyển đến trang đăng nhập...
+                        </p>
                     </div>
                 )}
 
