@@ -10,6 +10,8 @@ interface AuthState {
     reLoginCode: string | null;
     loading: boolean;
     error: string | null;
+    socketConnected: boolean;
+    socketConnectionError: string | null;
 }
 
 // State ban đầu khi project khởi động
@@ -19,6 +21,8 @@ const initialState: AuthState = {
     reLoginCode: localStorage.getItem('reLoginCode'),
     loading: false,
     error: null,
+    socketConnected: false,
+    socketConnectionError: null,
 };
 
 const authSlice = createSlice({
@@ -74,6 +78,21 @@ const authSlice = createSlice({
         clearError: (state) => {
             state.error = null;
         },
+
+        // WebSocket connection actions
+        socketConnected: (state) => {
+            state.socketConnected = true;
+            state.socketConnectionError = null;
+        },
+
+        socketDisconnected: (state) => {
+            state.socketConnected = false;
+        },
+
+        socketConnectionError: (state, action: PayloadAction<string>) => {
+            state.socketConnected = false;
+            state.socketConnectionError = action.payload;
+        },
     },
 });
 
@@ -85,6 +104,9 @@ export const {
     registerSuccess,
     logout,
     clearError,
+    socketConnected,
+    socketDisconnected,
+    socketConnectionError,
 } = authSlice.actions;
 
 // Export reducer để add vào store

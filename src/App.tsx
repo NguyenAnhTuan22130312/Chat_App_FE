@@ -3,6 +3,8 @@ import {BrowserRouter as Router, Routes, Route, Navigate, useNavigate} from 'rea
 import Login from './screens/Login';
 import Register from './screens/Register';
 import ChatWindow from './components/chat/ChatWindow';
+import LoadingScreen from './components/common/LoadingScreen';
+import ConnectionErrorScreen from './components/common/ConnectionErrorScreen';
 import {useAppSelector, useAppDispatch} from "./hooks/reduxHooks";
 import {socketService} from "./services/socketService";
 import {loginRequest, logout} from "./store/slices/authSlice";
@@ -81,28 +83,34 @@ function HomeLayout() {
 
 function App() {
     const isAuthenticated = useAppSelector((state) => state.auth.isAuthenticated);
+    const socketConnected = useAppSelector((state) => state.auth.socketConnected);
+    const socketConnectionError = useAppSelector((state) => state.auth.socketConnectionError);
 
     useEffect(() => {
         // Hàm async để đợi WebSocket kết nối
         const initializeConnection = async () => {
             // Kết nối WebSocket khi project khởi động
             console.log('Initializing WebSocket connection...');
-            await socketService.connect();
+            try {
+                await socketService.connect();
+                
+                // Chỉ auto-login nếu đã authenticated
+                if (isAuthenticated) {
+                    // Kiểm tra có RE_LOGIN_CODE trong localStorage không
+                    const reLoginCode = localStorage.getItem('reLoginCode');
+                    const username = localStorage.getItem('username');
 
-            // Chỉ auto-login nếu đã authenticated
-            if (isAuthenticated) {
-                // Kiểm tra có RE_LOGIN_CODE trong localStorage không
-                const reLoginCode = localStorage.getItem('reLoginCode');
-                const username = localStorage.getItem('username');
-
-                if (reLoginCode && username) {
-                    // Có -> Tự động đăng nhập lại
-                    console.log('Success, attempting auto-login...');
-                    store.dispatch(loginRequest());
-                    socketService.reLogin(username, reLoginCode);
-                } else {
-                    console.log('Error, user needs to login manually');
+                    if (reLoginCode && username) {
+                        // Có -> Tự động đăng nhập lại
+                        console.log('Success, attempting auto-login...');
+                        store.dispatch(loginRequest());
+                        socketService.reLogin(username, reLoginCode);
+                    } else {
+                        console.log('Error, user needs to login manually');
+                    }
                 }
+            } catch (error) {
+                console.error('Failed to initialize WebSocket connection:', error);
             }
         };
 
@@ -113,8 +121,19 @@ function App() {
         return () => {
             // socketService.disconnect(); // Đã remove
         };
-    }, [isAuthenticated]); // Chỉ chạy 1 lần khi app mount
+    }, []); // Chỉ chạy 1 lần khi app mount
 
+    // Show loading screen while connecting
+    if (!socketConnected && !socketConnectionError) {
+        return <LoadingScreen />;
+    }
+
+    // Show error screen if connection failed
+    if (socketConnectionError) {
+        return <ConnectionErrorScreen errorMessage={socketConnectionError} />;
+    }
+
+    // Show main app when connected
     return (
         <Router>
             <Routes>

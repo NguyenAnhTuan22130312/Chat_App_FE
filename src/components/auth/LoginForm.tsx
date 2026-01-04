@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { Link } from 'react-router-dom';
 import {useAppDispatch, useAppSelector} from "../../hooks/reduxHooks";
 import {clearError, loginRequest} from "../../store/slices/authSlice";
@@ -8,6 +8,10 @@ const LoginForm: React.FC = () => {
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
+
+  // Refs cho input fields
+  const usernameRef = useRef<HTMLInputElement>(null);
+  const passwordRef = useRef<HTMLInputElement>(null);
 
   // Lấy state từ Redux
   const dispatch = useAppDispatch();
@@ -82,6 +86,14 @@ const LoginForm: React.FC = () => {
     }
   };
 
+  // Enter key handler - Chuyển sang field tiếp theo
+  const handleUsernameKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (e.key === 'Enter') {
+      e.preventDefault();
+      passwordRef.current?.focus();
+    }
+  };
+
   return (
       <div className="w-1/2 h-screen flex items-center justify-center bg-gray-50 overflow-hidden">
         <form
@@ -112,9 +124,11 @@ const LoginForm: React.FC = () => {
               <UserIcon />
             </span>
               <input
+                  ref={usernameRef}
                   type="text"
                   value={username}
                   onChange={(e) => setUsername(e.target.value)}
+                  onKeyDown={handleUsernameKeyDown}
                   disabled={loading}
                   className="w-full px-3.5 pl-11 py-3.5 text-base text-gray-700 bg-white border-2 border-gray-300 rounded-lg outline-none transition-all duration-300 ease-in-out focus:border-primary focus:shadow-[0_0_0_3px_rgba(0,132,255,0.1)] disabled:bg-gray-100 disabled:cursor-not-allowed"
                   placeholder="Nhập tên đăng nhập"
@@ -132,6 +146,7 @@ const LoginForm: React.FC = () => {
               <LockIcon />
             </span>
               <input
+                  ref={passwordRef}
                   type={showPassword ? 'text' : 'password'}
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}

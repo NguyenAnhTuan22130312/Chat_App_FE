@@ -1,4 +1,4 @@
-import React, {useEffect, useState} from 'react';
+import React, {useEffect, useState, useRef} from 'react';
 import {Link, useNavigate} from 'react-router-dom';
 import {socketService} from "../../services/socketService";
 import {clearError, loginRequest} from "../../store/slices/authSlice";
@@ -12,6 +12,12 @@ const RegisterForm: React.FC = () => {
     const [showPassword, setShowPassword] = useState(false);
     const [showConfirmPassword, setShowConfirmPassword] = useState(false);
     const [registerSuccess, setRegisterSuccess] = useState(false);
+
+    // Refs cho input fields
+    const emailRef = useRef<HTMLInputElement>(null);
+    const usernameRef = useRef<HTMLInputElement>(null);
+    const passwordRef = useRef<HTMLInputElement>(null);
+    const confirmPasswordRef = useRef<HTMLInputElement>(null);
 
     const navigate = useNavigate();
     // Lấy state từ Redux
@@ -50,7 +56,12 @@ const RegisterForm: React.FC = () => {
             }
         };
 
-        socketService.connect(handleMessage);
+        // KHÔNG gọi connect() nữa vì đã connect ở App.tsx
+        // Chỉ set callback để listen messages
+        // socketService.connect(handleMessage);
+        
+        // TODO: Implement proper message listener pattern
+        // For now, register success is handled by Redux in socketService
     }, [navigate]);
 
     // Email icon SVG
@@ -125,6 +136,28 @@ const RegisterForm: React.FC = () => {
         }
     };
 
+    // Enter key handlers - Chuyển sang field tiếp theo
+    const handleEmailKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+        if (e.key === 'Enter') {
+            e.preventDefault();
+            usernameRef.current?.focus();
+        }
+    };
+
+    const handleUsernameKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+        if (e.key === 'Enter') {
+            e.preventDefault();
+            passwordRef.current?.focus();
+        }
+    };
+
+    const handlePasswordKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+        if (e.key === 'Enter') {
+            e.preventDefault();
+            confirmPasswordRef.current?.focus();
+        }
+    };
+
     return (
         <div className="w-1/2 h-screen flex items-center justify-center bg-gray-50 overflow-hidden">
             <form
@@ -164,9 +197,11 @@ const RegisterForm: React.FC = () => {
               <EmailIcon/>
             </span>
                         <input
+                            ref={emailRef}
                             type="email"
                             value={email}
                             onChange={(e) => setEmail(e.target.value)}
+                            onKeyDown={handleEmailKeyDown}
                             disabled={loading}
                             className="w-full px-3.5 pl-11 py-3.5 text-base text-gray-700 bg-white border-2 border-gray-300 rounded-lg outline-none transition-all duration-300 ease-in-out focus:border-primary focus:shadow-[0_0_0_3px_rgba(0,132,255,0.1)] disabled:bg-gray-100 disabled:cursor-not-allowed"
                             placeholder="Nhập email của bạn"
@@ -185,9 +220,11 @@ const RegisterForm: React.FC = () => {
               <UserIcon/>
             </span>
                         <input
+                            ref={usernameRef}
                             type="text"
                             value={username}
                             onChange={(e) => setUsername(e.target.value)}
+                            onKeyDown={handleUsernameKeyDown}
                             disabled={loading}
                             className="w-full px-3.5 pl-11 py-3.5 text-base text-gray-700 bg-white border-2 border-gray-300 rounded-lg outline-none transition-all duration-300 ease-in-out focus:border-primary focus:shadow-[0_0_0_3px_rgba(0,132,255,0.1)] disabled:bg-gray-100 disabled:cursor-not-allowed"
                             placeholder="Chọn tên đăng nhập"
@@ -206,9 +243,11 @@ const RegisterForm: React.FC = () => {
               <LockIcon/>
             </span>
                         <input
+                            ref={passwordRef}
                             type={showPassword ? 'text' : 'password'}
                             value={password}
                             onChange={(e) => setPassword(e.target.value)}
+                            onKeyDown={handlePasswordKeyDown}
                             disabled={loading}
                             className="w-full px-3.5 pl-11 py-3.5 text-base text-gray-700 bg-white border-2 border-gray-300 rounded-lg outline-none transition-all duration-300 ease-in-out focus:border-primary focus:shadow-[0_0_0_3px_rgba(0,132,255,0.1)] disabled:bg-gray-100 disabled:cursor-not-allowed"
                             placeholder="Tạo mật khẩu mạnh"
@@ -234,6 +273,7 @@ const RegisterForm: React.FC = () => {
               <LockIcon/>
             </span>
                         <input
+                            ref={confirmPasswordRef}
                             type={showConfirmPassword ? 'text' : 'password'}
                             value={confirmPassword}
                             onChange={(e) => setConfirmPassword(e.target.value)}

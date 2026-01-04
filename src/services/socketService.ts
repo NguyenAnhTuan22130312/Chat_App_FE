@@ -1,13 +1,25 @@
-import {loginFailure, loginSuccess, registerSuccess} from "../store/slices/authSlice";
+import {
+  loginFailure,
+  loginSuccess,
+  registerSuccess,
+  socketConnected,
+  socketDisconnected,
+  socketConnectionError
+} from "../store/slices/authSlice";
 import {store} from "../store/store";
 
 const SOCKET_URL = 'wss://chat.longapp.site/chat/chat';
+const CONNECTION_TIMEOUT = 30000; // 30s
+const MAX_RETRY_ATTEMPTS = 3;
 
 class SocketService {
   private socket: WebSocket | null = null;
   private messageCallback: (data: any) => void = () => {};
   private connectionReady: Promise<void> | null = null;
   private resolveConnection: (() => void) | null = null;
+  private rejectConnection: ((error: Error) => void) | null = null;
+  private connectionTimeout: NodeJS.Timeout | null = null;
+  private retryCount: number = 0;
 
   /**
    * kết nối tới web socket
@@ -19,14 +31,46 @@ class SocketService {
     }
 
     // Tạo Promise để đợi connection
-    this.connectionReady = new Promise((resolve) => {
+    this.connectionReady = new Promise((resolve, reject) => {
       this.resolveConnection = resolve;
+      this.rejectConnection = reject;
     });
+
+    // Set timeout cho connection
+    this.connectionTimeout = setTimeout(() => {
+      if (this.socket && this.socket.readyState !== WebSocket.OPEN) {
+        const errorMsg = 'Không thể kết nối đến máy chủ. Vui lòng kiểm tra kết nối mạng.';
+        console.error('WebSocket connection timeout');
+        store.dispatch(socketConnectionError(errorMsg));
+        
+        if (this.rejectConnection) {
+          this.rejectConnection(new Error(errorMsg));
+        }
+        
+        // Close socket nếu đang pending
+        if (this.socket) {
+          this.socket.close();
+        }
+      }
+    }, CONNECTION_TIMEOUT);
 
     this.socket = new WebSocket(SOCKET_URL);
 
     this.socket.onopen = () => {
       console.log('WebSocket Connected');
+      
+      // Clear timeout
+      if (this.connectionTimeout) {
+        clearTimeout(this.connectionTimeout);
+        this.connectionTimeout = null;
+      }
+      
+      // Reset retry count on successful connection
+      this.retryCount = 0;
+      
+      // Dispatch Redux action
+      store.dispatch(socketConnected());
+      
       this.messageCallback({ status: 'Connected to server' });
       
       // Resolve Promise khi connection ready
@@ -50,10 +94,38 @@ class SocketService {
       }
     };
 
+    this.socket.onerror = (error) => {
+      console.error('WebSocket Error:', error);
+      
+      // Clear timeout
+      if (this.connectionTimeout) {
+        clearTimeout(this.connectionTimeout);
+        this.connectionTimeout = null;
+      }
+      
+      const errorMsg = 'Lỗi kết nối WebSocket. Vui lòng thử lại.';
+      store.dispatch(socketConnectionError(errorMsg));
+      
+      if (this.rejectConnection) {
+        this.rejectConnection(new Error(errorMsg));
+      }
+    };
+
     this.socket.onclose = () => {
       console.log('WebSocket Closed');
+      
+      // Clear timeout
+      if (this.connectionTimeout) {
+        clearTimeout(this.connectionTimeout);
+        this.connectionTimeout = null;
+      }
+      
+      // Dispatch Redux action
+      store.dispatch(socketDisconnected());
+      
       this.connectionReady = null;
       this.resolveConnection = null;
+      this.rejectConnection = null;
     };
 
     return this.connectionReady;
@@ -115,7 +187,7 @@ class SocketService {
       console.log('Sending:', message);
       this.socket.send(message);
     } else {
-      console.error('Socket not conected');
+      console.error('Socket not connected');
       throw new Error('WebSocket chưa kết nối');
     }
   }
@@ -208,9 +280,32 @@ class SocketService {
   }
 
   disconnect() {
+    console.log('DISCONNECT called - closing WebSocket connection');
+    console.trace('Disconnect stack trace:'); // This will show where disconnect was called from
     if (this.socket) {
       this.socket.close();
     }
+  }
+
+  /**
+   * Reconnect to WebSocket server
+   */
+  reconnect(): Promise<void> {
+    console.log(`Reconnecting... (Attempt ${this.retryCount + 1}/${MAX_RETRY_ATTEMPTS})`);
+    
+    if (this.retryCount >= MAX_RETRY_ATTEMPTS) {
+      const errorMsg = `Không thể kết nối sau ${MAX_RETRY_ATTEMPTS} lần thử. Vui lòng kiểm tra kết nối mạng và thử lại sau.`;
+      store.dispatch(socketConnectionError(errorMsg));
+      return Promise.reject(new Error(errorMsg));
+    }
+    
+    this.retryCount++;
+    
+    // Disconnect existing connection if any
+    this.disconnect();
+    
+    // Try to connect again
+    return this.connect();
   }
 }
 
