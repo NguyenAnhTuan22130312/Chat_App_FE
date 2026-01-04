@@ -9,6 +9,7 @@ import {useAppSelector, useAppDispatch} from "./hooks/reduxHooks";
 import {socketService} from "./services/socketService";
 import {loginRequest, logout} from "./store/slices/authSlice";
 import {store} from "./store/store";
+import Sidebar from './components/sidebar/Sidebar';
 
 // Component for Home layout with Sidebar
 function HomeLayout() {
@@ -144,6 +145,7 @@ function App() {
                 <Route
                     path="/"
                     element={
+
                         isAuthenticated ? <HomeLayout /> : <Navigate to="/login" replace/>
                     }
                 />

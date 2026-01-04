@@ -8,7 +8,7 @@ import {
 } from "../store/slices/authSlice";
 import { addMessage, setMessages } from "../store/slices/chatSlice";
 import {store} from "../store/store";
-
+import { setUserList } from "../store/slices/userListSlice";
 const SOCKET_URL = 'wss://chat.longapp.site/chat/chat';
 const CONNECTION_TIMEOUT = 30000; // 30s
 const MAX_RETRY_ATTEMPTS = 3;
@@ -137,74 +137,95 @@ class SocketService {
   /**
    * Xử lý response từ server và dispatch Redux actions tương ứng
    */
-  private handleServerResponse(data: any) {
-    // Kiểm tra event type từ server
-    const event = data.event;
-    const status = data.status;
+private handleServerResponse(receivedData: any) {
+    console.log('Raw received:', receivedData); // Debug: xem chính xác cấu trúc
+
+    // QUAN TRỌNG: Server luôn bọc trong { action: "onchat", data: { ... } } hoặc gửi thẳng data
+    const payload = receivedData.action === 'onchat' ? receivedData.data : receivedData;
+    const event = payload.event;
+    const status = payload.status;
+    const responseData = payload.data;
+
+    console.log('Processed payload:', { event, status, responseData }); // Debug
 
     if (status === 'success') {
-      switch (event) {
-        case 'LOGIN':
-        case 'RE_LOGIN':
-          //Login succes
-              const  reLoginCode = data.data?.RE_LOGIN_CODE;
-              const username = localStorage.getItem('username') || '';
+        switch (event) {
+            case 'LOGIN':
+            case 'RE_LOGIN':
+                const reLoginCode = responseData?.RE_LOGIN_CODE;
+                const username = localStorage.getItem('username') || '';
+                store.dispatch(loginSuccess({
+                    user: { username },
+                    reLoginCode: reLoginCode,
+                }));
+                console.log('✅ Login/Relogin success, code:', reLoginCode);
+                // Gọi lấy danh sách user NGAY SAU KHI LOGIN HOẶC RELOGIN THÀNH CÔNG
+                this.getUserList();
+                break;
 
-              store.dispatch(loginSuccess({
-                user: { username },
-                reLoginCode: reLoginCode,
-              }));
-              break;
+            case 'REGISTER':
+                const registerCode = responseData?.RE_LOGIN_CODE;
+                const registerUser = localStorage.getItem('username') || '';
+                store.dispatch(registerSuccess({
+                    user: { username: registerUser },
+                    reLoginCode: registerCode,
+                }));
+                console.log('Register success');
+                break;
 
-        case 'REGISTER':
-          // register success
-              store.dispatch(registerSuccess());
-              break;
-              case "GET_PEOPLE_CHAT_MES":
-          const historyData = data.data;
-          console.log("Server trả về lịch sử chat raw:", historyData);
-          if (Array.isArray(historyData)) {
-            const sortedMessages = [...historyData].reverse();
-            store.dispatch(setMessages(sortedMessages));
-
-            console.log("Đã tải lịch sử chat:", sortedMessages.length, "tin nhắn");
-          }
-          break;
-
-              case "SEND_CHAT":
-                if (data.data) {
-                  store.dispatch(addMessage(data.data));
+            case 'GET_USER_LIST':
+                if (Array.isArray(responseData)) {
+                    store.dispatch(setUserList(responseData));
+                    console.log('✅ Đã nhận danh sách user:', responseData.map((u: any) => u.name).join(', '));
+                } else {
+                    console.warn('GET_USER_LIST data không hợp lệ:', responseData);
                 }
                 break;
 
-        default:
-          // Các event khác (chat, vv...)
-          break;
-      }
-    } else if (status === 'error') {
-      // Xử lý error
-      const errorMessage = data.mes || 'Có lỗi xảy ra';
+            case 'GET_PEOPLE_CHAT_MES':
+                const historyData = responseData;
+                console.log("Server trả về lịch sử chat raw:", historyData);
+                if (Array.isArray(historyData)) {
+                    const sortedMessages = [...historyData].reverse();
+                    store.dispatch(setMessages(sortedMessages));
+                    console.log("Đã tải lịch sử chat:", sortedMessages.length, "tin nhắn");
+                }
+                break;
 
-      if (errorMessage === 'User not Login') {
-        console.warn('⚠️ Server báo chưa đăng nhập. Đang tự động đăng nhập lại...');
+            case 'SEND_CHAT':
+                if (responseData) {
+                    store.dispatch(addMessage(responseData));
+                }
+                break;
 
-        const user = localStorage.getItem('username');
-        const code = localStorage.getItem('reLoginCode');
-
-        if (user && code) {
-            this.reLogin(user, code);
-        } else {
-             store.dispatch(loginFailure("Phiên đăng nhập hết hạn"));
+            default:
+                console.log('Event khác:', event);
+                break;
         }
-        return;
-    }
+    } else if (status === 'error') {
+        const errorMessage = payload.mes || 'Có lỗi xảy ra';
+        console.error('Server error:', errorMessage);
 
-      if (event === 'LOGIN' || event === 'RE_LOGIN' || event === 'REGISTER') {
-        store.dispatch(loginFailure(errorMessage));
-      }
-      console.error('Server error:', errorMessage);
+        // Xử lý đặc biệt khi hết hạn đăng nhập
+        if (errorMessage === 'User not Login') {
+            console.warn('⚠️ Server báo chưa đăng nhập. Đang tự động đăng nhập lại...');
+            const user = localStorage.getItem('username');
+            const code = localStorage.getItem('reLoginCode');
+            if (user && code) {
+                this.reLogin(user, code);
+            } else {
+                store.dispatch(loginFailure("Phiên đăng nhập hết hạn"));
+            }
+            return;
+        }
+
+        // Xử lý lỗi login/register
+        if (event === 'LOGIN' || event === 'RE_LOGIN' || event === 'REGISTER') {
+            store.dispatch(loginFailure(errorMessage));
+        }
     }
-  }
+}
+    }
 
   /**
    * Gửi data tới server (hàm onchat chung)
@@ -314,6 +335,63 @@ class SocketService {
       this.socket.close();
     }
   }
+    // Tạo phòng chat mới
+    createRoom(roomName: string) {
+        this.send({
+            event: 'CREATE_ROOM',
+            data: { name: roomName }
+        });
+    }
+
+    // Tham gia phòng chat
+    joinRoom(roomName: string) {
+        this.send({
+            event: 'JOIN_ROOM',
+            data: { name: roomName }
+        });
+    }
+
+    // Lấy lịch sử tin nhắn phòng (page bắt đầu từ 1)
+    getRoomHistory(roomName: string, page: number = 1) {
+        this.send({
+            event: 'GET_ROOM_CHAT_MES',
+            data: { name: roomName, page }
+        });
+    }
+
+    // Gửi tin nhắn vào phòng
+    sendMessageToRoom(roomName: string, message: string) {
+        this.send({
+            event: 'SEND_CHAT',
+            data: {
+                type: 'room',
+                to: roomName,
+                mes: message
+            }
+        });
+    }
+    // Lấy danh sách tất cả user đang đăng ký
+    getUserList() {
+        this.send({
+            event: 'GET_USER_LIST'
+        });
+    }
+
+    // Kiểm tra user có tồn tại không
+    checkUserExist(username: string) {
+        this.send({
+            event: 'CHECK_USER_EXIST',
+            data: { user: username }
+        });
+    }
+
+    // Kiểm tra user có online không
+    checkUserOnline(username: string) {
+        this.send({
+            event: 'CHECK_USER_ONLINE',
+            data: { user: username }
+        });
+    }
 
   /**
    * Reconnect to WebSocket server
