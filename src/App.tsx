@@ -80,34 +80,32 @@ function HomeLayout() {
 }
 
 function App() {
+    // Lấy trạng thái đăng nhập từ Redux
     const isAuthenticated = useAppSelector((state) => state.auth.isAuthenticated);
 
     useEffect(() => {
-        // Hàm async để đợi WebSocket kết nối
         const initializeConnection = async () => {
-            // Kết nối WebSocket khi project khởi động
+            // 1. Kết nối WebSocket
             console.log('Initializing WebSocket connection...');
             await socketService.connect();
 
-            // Chỉ auto-login nếu đã authenticated
-            if (isAuthenticated) {
-                // Kiểm tra có RE_LOGIN_CODE trong localStorage không
-                const reLoginCode = localStorage.getItem('reLoginCode');
-                const username = localStorage.getItem('username');
+            // 2. Kiểm tra xem có phiên đăng nhập cũ không
+            const reLoginCode = localStorage.getItem('reLoginCode');
+            const username = localStorage.getItem('username');
 
-                if (reLoginCode && username) {
-                    // Có -> Tự động đăng nhập lại
-                    console.log('Success, attempting auto-login...');
-                    store.dispatch(loginRequest());
-                    socketService.reLogin(username, reLoginCode);
-                } else {
-                    console.log('Error, user needs to login manually');
-                }
+            if (reLoginCode && username) {
+                console.log('Found session, attempting auto-login...');
+                // Nếu có, dispatch action để loading và gửi lệnh RE_LOGIN
+                store.dispatch(loginRequest());
+                socketService.reLogin(username, reLoginCode);
+            } else {
+                console.log('No session found, user needs to login manually');
             }
         };
 
         initializeConnection();
 
+        // Cleanup: Ngắt kết nối khi tắt App (optional)
         // Cleanup khi unmount - KHÔNG disconnect socket nữa
         // Vì socket cần duy trì để login hoạt động
         return () => {
@@ -118,23 +116,24 @@ function App() {
     return (
         <Router>
             <Routes>
-                {/* Route Login */}
+                {/* 1. Route Đăng Nhập */}
                 <Route
                     path="/login"
                     element={
-                        isAuthenticated ? <Navigate to="/" replace/> : <Login/>
+                        // Nếu đã đăng nhập thì đá sang trang chủ, chưa thì hiện Login
+                        isAuthenticated ? <Navigate to="/" replace /> : <Login />
                     }
                 />
 
-                {/* Route Register */}
+                {/* 2. Route Đăng Ký */}
                 <Route
                     path="/register"
                     element={
-                        isAuthenticated ? <Navigate to="/" replace/> : <Register/>
+                        isAuthenticated ? <Navigate to="/" replace /> : <Register />
                     }
                 />
 
-                {/* Protected Route - Trang Home/Chat */}
+                {/* 3. Route Chính (Chat) - Được bảo vệ */}
                 <Route
                     path="/"
                     element={
