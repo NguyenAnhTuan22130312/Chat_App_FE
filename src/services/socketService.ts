@@ -84,18 +84,12 @@ class SocketService {
 
         case 'REGISTER':
           // register success
-              const registerCode = data.data?.RE_LOGIN_CODE;
-              const registerUser = localStorage.getItem('username') || '';
-
-              store.dispatch(registerSuccess({
-                user: { username: registerUser },
-                reLoginCode: registerCode,
-              }));
+              store.dispatch(registerSuccess());
               console.log('Register success');
               break;
 
         default:
-          // Các event != (chat, vv...)
+          // Các event khác (chat, vv...)
           break;
       }
     } else if (status === 'error') {
@@ -129,7 +123,12 @@ class SocketService {
 
 
   // đăng ký
-  register(user: string, pass: string) {
+  async register(user: string, pass: string) {
+    // Đợi connection ready nếu đang kết nối
+    if (this.connectionReady) {
+      await this.connectionReady;
+    }
+    
     // Lưu username vào localStorage để dùng khi nhận response
     localStorage.setItem('username', user);
 
@@ -143,7 +142,12 @@ class SocketService {
   }
 
   // đăng nhập
-  login(user: string, pass: string) {
+  async login(user: string, pass: string) {
+    // Đợi connection ready nếu đang kết nối
+    if (this.connectionReady) {
+      await this.connectionReady;
+    }
+    
     // Lưu username vào localStorage để dùng khi nhận response
     localStorage.setItem('username', user);
     this.send({
@@ -164,6 +168,20 @@ class SocketService {
         code: code
       }
     });
+  }
+
+
+  // Đăng xuất
+  logout() {
+    // Chỉ gửi LOGOUT event nếu socket đã kết nối
+    if (this.socket && this.socket.readyState === WebSocket.OPEN) {
+      this.send({
+        event: 'LOGOUT'
+      });
+    } else {
+      // Nếu socket chưa kết nối, chỉ log warning, không throw error
+      console.warn('Socket not connected, skipping LOGOUT event');
+    }
   }
 
   // chat với người 
