@@ -1,5 +1,4 @@
-import React, { FC } from 'react';
-import { useAppSelector } from '../../hooks/reduxHooks'; 
+import { useAppSelector } from '../../hooks/reduxHooks';
 
 export default function ChatHeader() {
 

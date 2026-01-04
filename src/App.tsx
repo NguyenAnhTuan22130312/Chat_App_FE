@@ -3,6 +3,8 @@ import {BrowserRouter as Router, Routes, Route, Navigate, useNavigate} from 'rea
 import Login from './screens/Login';
 import Register from './screens/Register';
 import ChatWindow from './components/chat/ChatWindow';
+import LoadingScreen from './components/common/LoadingScreen';
+import ConnectionErrorScreen from './components/common/ConnectionErrorScreen';
 import {useAppSelector, useAppDispatch} from "./hooks/reduxHooks";
 import {socketService} from "./services/socketService";
 import {loginRequest, logout} from "./store/slices/authSlice";
@@ -80,52 +82,57 @@ function HomeLayout() {
 }
 
 function App() {
-    // Lấy trạng thái đăng nhập từ Redux
     const isAuthenticated = useAppSelector((state) => state.auth.isAuthenticated);
+    const socketConnected = useAppSelector((state) => state.auth.socketConnected);
+    const socketConnectionError = useAppSelector((state) => state.auth.socketConnectionError);
 
     useEffect(() => {
         const initializeConnection = async () => {
-            // 1. Kết nối WebSocket
-            console.log('Initializing WebSocket connection...');
-            await socketService.connect();
+            try {
+                await socketService.connect();
+                
+                // Chỉ auto-login nếu đã authenticated
+                if (isAuthenticated) {
+                    const reLoginCode = localStorage.getItem('reLoginCode');
+                    const username = localStorage.getItem('username');
 
-            // 2. Kiểm tra xem có phiên đăng nhập cũ không
-            const reLoginCode = localStorage.getItem('reLoginCode');
-            const username = localStorage.getItem('username');
-
-            if (reLoginCode && username) {
-                console.log('Found session, attempting auto-login...');
-                // Nếu có, dispatch action để loading và gửi lệnh RE_LOGIN
-                store.dispatch(loginRequest());
-                socketService.reLogin(username, reLoginCode);
-            } else {
-                console.log('No session found, user needs to login manually');
+                    if (reLoginCode && username) {
+                        // Tự động đăng nhập lại
+                        store.dispatch(loginRequest());
+                        socketService.reLogin(username, reLoginCode);
+                    }
+                }
+            } catch (error) {
+                console.error('Failed to initialize WebSocket connection:', error);
             }
         };
 
         initializeConnection();
+    }, [isAuthenticated]);
 
-        // Cleanup: Ngắt kết nối khi tắt App (optional)
-        // Cleanup khi unmount - KHÔNG disconnect socket nữa
-        // Vì socket cần duy trì để login hoạt động
-        return () => {
-            // socketService.disconnect(); // Đã remove
-        };
-    }, [isAuthenticated]); // Chỉ chạy 1 lần khi app mount
+    // Show loading screen while connecting
+    if (!socketConnected && !socketConnectionError) {
+        return <LoadingScreen />;
+    }
 
+    // Show error screen if connection failed
+    if (socketConnectionError) {
+        return <ConnectionErrorScreen errorMessage={socketConnectionError} />;
+    }
+
+    // Show main app when connected
     return (
         <Router>
             <Routes>
-                {/* 1. Route Đăng Nhập */}
+                {/* Route Login */}
                 <Route
                     path="/login"
                     element={
-                        // Nếu đã đăng nhập thì đá sang trang chủ, chưa thì hiện Login
                         isAuthenticated ? <Navigate to="/" replace /> : <Login />
                     }
                 />
 
-                {/* 2. Route Đăng Ký */}
+                {/* Route Register */}
                 <Route
                     path="/register"
                     element={
@@ -133,7 +140,7 @@ function App() {
                     }
                 />
 
-                {/* 3. Route Chính (Chat) - Được bảo vệ */}
+                {/* Protected Route - Trang Home/Chat */}
                 <Route
                     path="/"
                     element={

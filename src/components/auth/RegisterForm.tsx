@@ -1,30 +1,31 @@
-import React, {useEffect, useState} from 'react';
+import React, {useEffect, useState, useRef} from 'react';
 import {Link, useNavigate} from 'react-router-dom';
 import {socketService} from "../../services/socketService";
-import {clearError, loginRequest} from "../../store/slices/authSlice";
 import {useAppDispatch, useAppSelector} from "../../hooks/reduxHooks";
+import {clearError, loginRequest} from "../../store/slices/authSlice";
 
 const RegisterForm: React.FC = () => {
-    const [email, setEmail] = useState('');
     const [username, setUsername] = useState('');
     const [password, setPassword] = useState('');
     const [confirmPassword, setConfirmPassword] = useState('');
     const [showPassword, setShowPassword] = useState(false);
     const [showConfirmPassword, setShowConfirmPassword] = useState(false);
-    const [registerSuccess, setRegisterSuccess] = useState(false);
+
+    // Refs cho input fields
+    const usernameRef = useRef<HTMLInputElement>(null);
+    const passwordRef = useRef<HTMLInputElement>(null);
+    const confirmPasswordRef = useRef<HTMLInputElement>(null);
 
     const navigate = useNavigate();
-    // Lấy state từ Redux
     const dispatch = useAppDispatch();
-    const {loading, error} = useAppSelector((state) => state.auth);
+    const {loading, error, registerSuccess} = useAppSelector((state) => state.auth);
 
-    // Xóa error khi component unmount
+    // Clear error khi component mount
     useEffect(() => {
-        return () => {
-            dispatch(clearError());
-        };
+        dispatch(clearError());
     }, [dispatch]);
 
+    // Tự động xóa error sau 5 giây
     useEffect(() => {
         if (error) {
             const timeout = setTimeout(() => {
@@ -34,33 +35,17 @@ const RegisterForm: React.FC = () => {
         }
     }, [error, dispatch]);
 
-    // Listen for register success và navigate to login
     useEffect(() => {
-        const handleMessage = (data: any) => {
-            if (data.event === 'REGISTER' && data.status === 'success') {
-                setRegisterSuccess(true);
-                // Hiển thị thông báo và chuyển về login sau 2 giây
-                setTimeout(() => {
-                    navigate('/login', { 
-                        state: { 
-                            message: 'Đăng ký thành công! Vui lòng đăng nhập.' 
-                        } 
-                    });
-                }, 2000);
-            }
-        };
-
-        socketService.connect(handleMessage);
-    }, [navigate]);
-
-    // Email icon SVG
-    const EmailIcon = () => (
-        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"
-             strokeLinecap="round" strokeLinejoin="round">
-            <path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"></path>
-            <polyline points="22,6 12,13 2,6"></polyline>
-        </svg>
-    );
+        if (registerSuccess) {
+            setTimeout(() => {
+                navigate('/login', { 
+                    state: { 
+                        message: 'Đăng ký thành công! Vui lòng đăng nhập.' 
+                    } 
+                });
+            }, 2000);
+        }
+    }, [registerSuccess, navigate]);
 
     // User icon SVG
     const UserIcon = () => (
@@ -118,10 +103,23 @@ const RegisterForm: React.FC = () => {
         // Gọi socketService để gửi packet REGISTER
         try {
             await socketService.register(username, password);
-            console.log('Register request sent for user:', username);
         } catch (err: any) {
             console.error('Failed to send register request:', err);
-            // Không hiển thị alert nữa, để Redux handle error
+        }
+    };
+
+    // Enter key handlers - Chuyển sang field tiếp theo
+    const handleUsernameKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+        if (e.key === 'Enter') {
+            e.preventDefault();
+            passwordRef.current?.focus();
+        }
+    };
+
+    const handlePasswordKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+        if (e.key === 'Enter') {
+            e.preventDefault();
+            confirmPasswordRef.current?.focus();
         }
     };
 
@@ -154,27 +152,6 @@ const RegisterForm: React.FC = () => {
                     </div>
                 )}
 
-                {/* Email Field */}
-                <div className="mb-5">
-                    <label className="block text-base font-medium text-gray-700 mb-2">
-                        Email
-                    </label>
-                    <div className="relative flex items-center">
-            <span className="absolute left-3.5 text-gray-400 pointer-events-none z-10 flex items-center">
-              <EmailIcon/>
-            </span>
-                        <input
-                            type="email"
-                            value={email}
-                            onChange={(e) => setEmail(e.target.value)}
-                            disabled={loading}
-                            className="w-full px-3.5 pl-11 py-3.5 text-base text-gray-700 bg-white border-2 border-gray-300 rounded-lg outline-none transition-all duration-300 ease-in-out focus:border-primary focus:shadow-[0_0_0_3px_rgba(0,132,255,0.1)] disabled:bg-gray-100 disabled:cursor-not-allowed"
-                            placeholder="Nhập email của bạn"
-                            required
-                        />
-                    </div>
-                </div>
-
                 {/* Username Field */}
                 <div className="mb-5">
                     <label className="block text-base font-medium text-gray-700 mb-2">
@@ -185,9 +162,11 @@ const RegisterForm: React.FC = () => {
               <UserIcon/>
             </span>
                         <input
+                            ref={usernameRef}
                             type="text"
                             value={username}
                             onChange={(e) => setUsername(e.target.value)}
+                            onKeyDown={handleUsernameKeyDown}
                             disabled={loading}
                             className="w-full px-3.5 pl-11 py-3.5 text-base text-gray-700 bg-white border-2 border-gray-300 rounded-lg outline-none transition-all duration-300 ease-in-out focus:border-primary focus:shadow-[0_0_0_3px_rgba(0,132,255,0.1)] disabled:bg-gray-100 disabled:cursor-not-allowed"
                             placeholder="Chọn tên đăng nhập"
@@ -206,9 +185,11 @@ const RegisterForm: React.FC = () => {
               <LockIcon/>
             </span>
                         <input
+                            ref={passwordRef}
                             type={showPassword ? 'text' : 'password'}
                             value={password}
                             onChange={(e) => setPassword(e.target.value)}
+                            onKeyDown={handlePasswordKeyDown}
                             disabled={loading}
                             className="w-full px-3.5 pl-11 py-3.5 text-base text-gray-700 bg-white border-2 border-gray-300 rounded-lg outline-none transition-all duration-300 ease-in-out focus:border-primary focus:shadow-[0_0_0_3px_rgba(0,132,255,0.1)] disabled:bg-gray-100 disabled:cursor-not-allowed"
                             placeholder="Tạo mật khẩu mạnh"
@@ -234,6 +215,7 @@ const RegisterForm: React.FC = () => {
               <LockIcon/>
             </span>
                         <input
+                            ref={confirmPasswordRef}
                             type={showConfirmPassword ? 'text' : 'password'}
                             value={confirmPassword}
                             onChange={(e) => setConfirmPassword(e.target.value)}
