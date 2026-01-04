@@ -29,7 +29,7 @@ const LoginBanner: React.FC = () => {
           Xin Chào Bạn!
         </h1>
         <p className="text-xl text-white/95 m-0 leading-relaxed">
-          Nhập thông tin cá nhân của bạn và bắt đầu hành trình cùng chúng tôi
+          Nhập thông tin cá nhân của bạn và bắt đầu chat trên khắp thế giới!
         </p>
       </div>
     </div>
