@@ -7,6 +7,7 @@ import {useAppSelector} from "./hooks/reduxHooks";
 import {socketService} from "./services/socketService";
 import {loginRequest} from "./store/slices/authSlice";
 import {store} from "./store/store";
+import Sidebar from './components/sidebar/Sidebar';
 
 function App() {
     const isAuthenticated = useAppSelector((state) => state.auth.isAuthenticated);
@@ -65,11 +66,8 @@ function App() {
                     element={
                         isAuthenticated ? (
                             <div className="flex h-screen w-full overflow-hidden bg-white">
-                                <div
-                                    className="w-[360px] h-full bg-gray-100 border-r border-gray-300 hidden md:flex items-center justify-center">
-              <span className="text-gray-400 font-bold">
-                Sidebar Area <br/> (Trung Han)
-              </span>
+                                <div className="w-[360px] h-full bg-gray-100 border-r border-gray-300">
+                                    <Sidebar />
                                 </div>
                                 <div className="flex-1 h-full">
                                     <ChatWindow/>

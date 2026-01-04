@@ -1,6 +1,6 @@
 import {loginFailure, loginSuccess, registerSuccess} from "../store/slices/authSlice";
 import {store} from "../store/store";
-
+import { setUserList } from "../store/slices/userListSlice";
 const SOCKET_URL = 'wss://chat.longapp.site/chat/chat';
 
 class SocketService {
@@ -62,52 +62,71 @@ class SocketService {
   /**
    * Xử lý response từ server và dispatch Redux actions tương ứng
    */
-  private handleServerResponse(data: any) {
-    // Kiểm tra event type từ server
-    const event = data.event;
-    const status = data.status;
+    /**
+     * Xử lý response từ server và dispatch Redux actions tương ứng
+     */
+    private handleServerResponse(receivedData: any) {
+        console.log('Raw received:', receivedData); // Debug: xem chính xác cấu trúc
 
-    if (status === 'success') {
-      switch (event) {
-        case 'LOGIN':
-        case 'RE_LOGIN':
-          //Login succes
-              const  reLoginCode = data.data?.RE_LOGIN_CODE;
-              const username = localStorage.getItem('username') || '';
+        // QUAN TRỌNG: Server luôn bọc trong { action: "onchat", data: { ... } }
+        const payload = receivedData.action === 'onchat' ? receivedData.data : receivedData;
 
-              store.dispatch(loginSuccess({
-                user: { username },
-                reLoginCode: reLoginCode,
-              }));
-              console.log('Login success, RE_LOGIN_CODE:', reLoginCode);
-              break;
+        const event = payload.event;
+        const status = payload.status;
+        const responseData = payload.data;
 
-        case 'REGISTER':
-          // register success
-              const registerCode = data.data?.RE_LOGIN_CODE;
-              const registerUser = localStorage.getItem('username') || '';
+        console.log('Processed payload:', { event, status, responseData }); // Debug
 
-              store.dispatch(registerSuccess({
-                user: { username: registerUser },
-                reLoginCode: registerCode,
-              }));
-              console.log('Register success');
-              break;
+        if (status === 'success') {
+            switch (event) {
+                case 'LOGIN':
+                case 'RE_LOGIN':
+                    const reLoginCode = responseData?.RE_LOGIN_CODE;
+                    const username = localStorage.getItem('username') || '';
 
-        default:
-          // Các event != (chat, vv...)
-          break;
-      }
-    } else if (status === 'error') {
-      // Xử lý error
-      const errorMessage = data.mes || 'Có lỗi xảy ra';
+                    store.dispatch(loginSuccess({
+                        user: { username },
+                        reLoginCode: reLoginCode,
+                    }));
+                    console.log('✅ Login/Relogin success, code:', reLoginCode);
 
-      if (event === 'LOGIN' || event === 'RE_LOGIN' || event === 'REGISTER') {
-        store.dispatch(loginFailure(errorMessage));
-      }
-      console.error('server error:', errorMessage)
+                    // Gọi lấy danh sách user NGAY SAU KHI LOGIN HOẶC RELOGIN THÀNH CÔNG
+                    this.getUserList();
+                    break;
+
+                case 'REGISTER':
+                    const registerCode = responseData?.RE_LOGIN_CODE;
+                    const registerUser = localStorage.getItem('username') || '';
+
+                    store.dispatch(registerSuccess({
+                        user: { username: registerUser },
+                        reLoginCode: registerCode,
+                    }));
+                    console.log('Register success');
+                    break;
+
+                case 'GET_USER_LIST':
+                    if (Array.isArray(responseData)) {
+                        store.dispatch(setUserList(responseData));
+                        console.log('✅ Đã nhận danh sách user:', responseData.map((u: any) => u.name).join(', '));
+                    } else {
+                        console.warn('GET_USER_LIST data không hợp lệ:', responseData);
+                    }
+                    break;
+
+                default:
+                    console.log('Event khác (chat, room,...):', event);
+                    break;
+            }
+        } else if (status === 'error') {
+            const errorMessage = payload.mes || 'Có lỗi xảy ra';
+            console.error('Server error:', errorMessage);
+
+            if (event === 'LOGIN' || event === 'RE_LOGIN' || event === 'REGISTER') {
+                store.dispatch(loginFailure(errorMessage));
+            }
+        }
     }
-  }
 
   /**
    * Gửi data tới server (hàm onchat chung)
@@ -194,6 +213,63 @@ class SocketService {
       this.socket.close();
     }
   }
+    // Tạo phòng chat mới
+    createRoom(roomName: string) {
+        this.send({
+            event: 'CREATE_ROOM',
+            data: { name: roomName }
+        });
+    }
+
+    // Tham gia phòng chat
+    joinRoom(roomName: string) {
+        this.send({
+            event: 'JOIN_ROOM',
+            data: { name: roomName }
+        });
+    }
+
+    // Lấy lịch sử tin nhắn phòng (page bắt đầu từ 1)
+    getRoomHistory(roomName: string, page: number = 1) {
+        this.send({
+            event: 'GET_ROOM_CHAT_MES',
+            data: { name: roomName, page }
+        });
+    }
+
+    // Gửi tin nhắn vào phòng
+    sendMessageToRoom(roomName: string, message: string) {
+        this.send({
+            event: 'SEND_CHAT',
+            data: {
+                type: 'room',
+                to: roomName,
+                mes: message
+            }
+        });
+    }
+    // Lấy danh sách tất cả user đang đăng ký
+    getUserList() {
+        this.send({
+            event: 'GET_USER_LIST'
+        });
+    }
+
+    // Kiểm tra user có tồn tại không
+    checkUserExist(username: string) {
+        this.send({
+            event: 'CHECK_USER_EXIST',
+            data: { user: username }
+        });
+    }
+
+    // Kiểm tra user có online không
+    checkUserOnline(username: string) {
+        this.send({
+            event: 'CHECK_USER_ONLINE',
+            data: { user: username }
+        });
+    }
 }
 
 export const socketService = new SocketService();
