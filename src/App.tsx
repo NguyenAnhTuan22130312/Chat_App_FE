@@ -89,8 +89,6 @@ function App() {
     useEffect(() => {
         // Hàm async để đợi WebSocket kết nối
         const initializeConnection = async () => {
-            // Kết nối WebSocket khi project khởi động
-            console.log('Initializing WebSocket connection...');
             try {
                 await socketService.connect();
                 
@@ -101,12 +99,9 @@ function App() {
                     const username = localStorage.getItem('username');
 
                     if (reLoginCode && username) {
-                        // Có -> Tự động đăng nhập lại
-                        console.log('Success, attempting auto-login...');
+                        // Tự động đăng nhập lại
                         store.dispatch(loginRequest());
                         socketService.reLogin(username, reLoginCode);
-                    } else {
-                        console.log('Error, user needs to login manually');
                     }
                 }
             } catch (error) {
@@ -115,13 +110,7 @@ function App() {
         };
 
         initializeConnection();
-
-        // Cleanup khi unmount - KHÔNG disconnect socket nữa
-        // Vì socket cần duy trì để login hoạt động
-        return () => {
-            // socketService.disconnect(); // Đã remove
-        };
-    }, [isAuthenticated]); // Re-run if authentication status changes
+    }, [isAuthenticated]);
 
     // Show loading screen while connecting
     if (!socketConnected && !socketConnectionError) {

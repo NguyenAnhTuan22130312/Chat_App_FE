@@ -17,16 +17,14 @@ const LoginForm: React.FC = () => {
   const dispatch = useAppDispatch();
   const { loading, error } = useAppSelector((state) => state.auth);
 
-  // Xóa error khi component unmount hoặc khi user thay đổi input
+  // Clear error khi component mount
   useEffect(() => {
-    return () => {
-      dispatch(clearError());
-    };
+    dispatch(clearError());
   }, [dispatch]);
 
+  // Tự động xóa error sau 5 giây
   useEffect(() => {
     if (error) {
-      // Tự động xóa error sau 5 giây
       const timeout = setTimeout(() => {
         dispatch(clearError());
       }, 5000);
@@ -80,7 +78,6 @@ const LoginForm: React.FC = () => {
     // Gọi socketService để gửi packet LOGIN
     try {
       await socketService.login(username, password);
-      console.log('Login request sent for user:', username);
     } catch (err: any) {
       console.error('Failed to send login request:', err);
     }
@@ -161,18 +158,6 @@ const LoginForm: React.FC = () => {
               <EyeIcon isOpen={showPassword} />
             </span>
             </div>
-          </div>
-
-          {/* Forgot Password */}
-          <div className="text-right mt-2 mb-7">
-            <button
-                type="button"
-                onClick={() => alert('Tính năng đang phát triển')}
-                disabled={loading}
-                className="text-[15px] text-primary bg-transparent border-none cursor-pointer font-medium transition-opacity duration-200 hover:opacity-70 hover:underline p-0 disabled:opacity-50 disabled:cursor-not-allowed"
-            >
-              Quên mật khẩu?
-            </button>
           </div>
 
           {/* Login Button */}

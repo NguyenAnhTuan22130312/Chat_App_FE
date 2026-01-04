@@ -10,6 +10,7 @@ interface AuthState {
     reLoginCode: string | null;
     loading: boolean;
     error: string | null;
+    registerSuccess: boolean;
     socketConnected: boolean;
     socketConnectionError: string | null;
 }
@@ -21,6 +22,7 @@ const initialState: AuthState = {
     reLoginCode: localStorage.getItem('reLoginCode'),
     loading: false,
     error: null,
+    registerSuccess: false,
     socketConnected: false,
     socketConnectionError: null,
 };
@@ -59,10 +61,10 @@ const authSlice = createSlice({
             state.error = action.payload;
         },
 
-        // Đăng ký thành công
         registerSuccess: (state) => {
             state.loading = false;
             state.error = null;
+            state.registerSuccess = true;
         },
 
         // Đăng xuất
@@ -96,7 +98,6 @@ const authSlice = createSlice({
     },
 });
 
-// Export actions dùng cho components
 export const {
     loginRequest,
     loginSuccess,

@@ -57,8 +57,6 @@ class SocketService {
     this.socket = new WebSocket(SOCKET_URL);
 
     this.socket.onopen = () => {
-      console.log('WebSocket Connected');
-      
       // Clear timeout
       if (this.connectionTimeout) {
         clearTimeout(this.connectionTimeout);
@@ -82,7 +80,6 @@ class SocketService {
     this.socket.onmessage = (event) => {
       try {
         const data = JSON.parse(event.data);
-        console.log('Received:', data);
 
         // Xử lý response và dispatch Redux actions tự động
         this.handleServerResponse(data);
@@ -90,7 +87,7 @@ class SocketService {
         // Gọi callback nếu có
         this.messageCallback(data);
       } catch (error) {
-        console.error('Errormessage', error);
+        console.error('Error parsing message:', error);
       }
     };
 
@@ -112,8 +109,6 @@ class SocketService {
     };
 
     this.socket.onclose = () => {
-      console.log('WebSocket Closed');
-      
       // Clear timeout
       if (this.connectionTimeout) {
         clearTimeout(this.connectionTimeout);
@@ -151,13 +146,11 @@ class SocketService {
                 user: { username },
                 reLoginCode: reLoginCode,
               }));
-              console.log('Login success, RE_LOGIN_CODE:', reLoginCode);
               break;
 
         case 'REGISTER':
           // register success
               store.dispatch(registerSuccess());
-              console.log('Register success');
               break;
 
         default:
@@ -171,7 +164,7 @@ class SocketService {
       if (event === 'LOGIN' || event === 'RE_LOGIN' || event === 'REGISTER') {
         store.dispatch(loginFailure(errorMessage));
       }
-      console.error('server error:', errorMessage)
+      console.error('Server error:', errorMessage);
     }
   }
 
@@ -184,7 +177,6 @@ class SocketService {
         action: 'onchat',
         data: payload
       });
-      console.log('Sending:', message);
       this.socket.send(message);
     } else {
       console.error('Socket not connected');
@@ -280,8 +272,6 @@ class SocketService {
   }
 
   disconnect() {
-    console.log('DISCONNECT called - closing WebSocket connection');
-    console.trace('Disconnect stack trace:'); // This will show where disconnect was called from
     if (this.socket) {
       this.socket.close();
     }
@@ -291,8 +281,6 @@ class SocketService {
    * Reconnect to WebSocket server
    */
   reconnect(): Promise<void> {
-    console.log(`Reconnecting... (Attempt ${this.retryCount + 1}/${MAX_RETRY_ATTEMPTS})`);
-    
     if (this.retryCount >= MAX_RETRY_ATTEMPTS) {
       const errorMsg = `Không thể kết nối sau ${MAX_RETRY_ATTEMPTS} lần thử. Vui lòng kiểm tra kết nối mạng và thử lại sau.`;
       store.dispatch(socketConnectionError(errorMsg));
