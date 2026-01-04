@@ -40,29 +40,17 @@ const RegisterForm: React.FC = () => {
         }
     }, [error, dispatch]);
 
-    // Listen for register success và navigate to login
     useEffect(() => {
-        const handleMessage = (data: any) => {
-            if (data.event === 'REGISTER' && data.status === 'success') {
-                setRegisterSuccess(true);
-                // Hiển thị thông báo và chuyển về login sau 2 giây
-                setTimeout(() => {
-                    navigate('/login', { 
-                        state: { 
-                            message: 'Đăng ký thành công! Vui lòng đăng nhập.' 
-                        } 
-                    });
-                }, 2000);
-            }
-        };
-
-        // KHÔNG gọi connect() nữa vì đã connect ở App.tsx
-        // Chỉ set callback để listen messages
-        // socketService.connect(handleMessage);
-        
-        // TODO: Implement proper message listener pattern
-        // For now, register success is handled by Redux in socketService
-    }, [navigate]);
+        if (registerSuccess) {
+            setTimeout(() => {
+                navigate('/login', { 
+                    state: { 
+                        message: 'Đăng ký thành công! Vui lòng đăng nhập.' 
+                    } 
+                });
+            }, 2000);
+        }
+    }, [registerSuccess, navigate]);
 
     // Email icon SVG
     const EmailIcon = () => (

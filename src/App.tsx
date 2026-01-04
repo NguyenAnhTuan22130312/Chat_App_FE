@@ -121,7 +121,7 @@ function App() {
         return () => {
             // socketService.disconnect(); // Đã remove
         };
-    }, []); // Chỉ chạy 1 lần khi app mount
+    }, [isAuthenticated]); // Re-run if authentication status changes
 
     // Show loading screen while connecting
     if (!socketConnected && !socketConnectionError) {
