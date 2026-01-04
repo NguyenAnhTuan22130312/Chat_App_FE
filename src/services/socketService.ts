@@ -1,13 +1,26 @@
-import {loginFailure, loginSuccess, registerSuccess} from "../store/slices/authSlice";
+import {
+  loginFailure,
+  loginSuccess,
+  registerSuccess,
+  socketConnected,
+  socketDisconnected,
+  socketConnectionError
+} from "../store/slices/authSlice";
+import { addMessage, setMessages } from "../store/slices/chatSlice";
 import {store} from "../store/store";
 import { setUserList } from "../store/slices/userListSlice";
 const SOCKET_URL = 'wss://chat.longapp.site/chat/chat';
+const CONNECTION_TIMEOUT = 30000; // 30s
+const MAX_RETRY_ATTEMPTS = 3;
 
 class SocketService {
   private socket: WebSocket | null = null;
   private messageCallback: (data: any) => void = () => {};
   private connectionReady: Promise<void> | null = null;
   private resolveConnection: (() => void) | null = null;
+  private rejectConnection: ((error: Error) => void) | null = null;
+  private connectionTimeout: NodeJS.Timeout | null = null;
+  private retryCount: number = 0;
 
   /**
    * kết nối tới web socket
@@ -17,16 +30,53 @@ class SocketService {
     if (onMessageReceived) {
       this.messageCallback = onMessageReceived;
     }
+    if (this.socket && this.socket.readyState === WebSocket.OPEN) {
+      return Promise.resolve();
+  }
+
+  if (this.connectionReady) {
+      return this.connectionReady;
+  }
 
     // Tạo Promise để đợi connection
-    this.connectionReady = new Promise((resolve) => {
+    this.connectionReady = new Promise((resolve, reject) => {
       this.resolveConnection = resolve;
+      this.rejectConnection = reject;
     });
+
+    // Set timeout cho connection
+    this.connectionTimeout = setTimeout(() => {
+      if (this.socket && this.socket.readyState !== WebSocket.OPEN) {
+        const errorMsg = 'Không thể kết nối đến máy chủ. Vui lòng kiểm tra kết nối mạng.';
+        console.error('WebSocket connection timeout');
+        store.dispatch(socketConnectionError(errorMsg));
+
+        if (this.rejectConnection) {
+          this.rejectConnection(new Error(errorMsg));
+        }
+
+        // Close socket nếu đang pending
+        if (this.socket) {
+          this.socket.close();
+        }
+      }
+    }, CONNECTION_TIMEOUT);
 
     this.socket = new WebSocket(SOCKET_URL);
 
     this.socket.onopen = () => {
-      console.log('WebSocket Connected');
+      // Clear timeout
+      if (this.connectionTimeout) {
+        clearTimeout(this.connectionTimeout);
+        this.connectionTimeout = null;
+      }
+
+      // Reset retry count on successful connection
+      this.retryCount = 0;
+
+      // Dispatch Redux action
+      store.dispatch(socketConnected());
+
       this.messageCallback({ status: 'Connected to server' });
       
       // Resolve Promise khi connection ready
@@ -38,7 +88,6 @@ class SocketService {
     this.socket.onmessage = (event) => {
       try {
         const data = JSON.parse(event.data);
-        console.log('Received:', data);
 
         // Xử lý response và dispatch Redux actions tự động
         this.handleServerResponse(data);
@@ -46,14 +95,40 @@ class SocketService {
         // Gọi callback nếu có
         this.messageCallback(data);
       } catch (error) {
-        console.error('Errormessage', error);
+        console.error('Error parsing message:', error);
+      }
+    };
+
+    this.socket.onerror = (error) => {
+      console.error('WebSocket Error:', error);
+
+      // Clear timeout
+      if (this.connectionTimeout) {
+        clearTimeout(this.connectionTimeout);
+        this.connectionTimeout = null;
+      }
+
+      const errorMsg = 'Lỗi kết nối WebSocket. Vui lòng thử lại.';
+      store.dispatch(socketConnectionError(errorMsg));
+
+      if (this.rejectConnection) {
+        this.rejectConnection(new Error(errorMsg));
       }
     };
 
     this.socket.onclose = () => {
-      console.log('WebSocket Closed');
+      // Clear timeout
+      if (this.connectionTimeout) {
+        clearTimeout(this.connectionTimeout);
+        this.connectionTimeout = null;
+      }
+
+      // Dispatch Redux action
+      store.dispatch(socketDisconnected());
+
       this.connectionReady = null;
       this.resolveConnection = null;
+      this.rejectConnection = null;
     };
 
     return this.connectionReady;
@@ -62,70 +137,94 @@ class SocketService {
   /**
    * Xử lý response từ server và dispatch Redux actions tương ứng
    */
-    /**
-     * Xử lý response từ server và dispatch Redux actions tương ứng
-     */
-    private handleServerResponse(receivedData: any) {
-        console.log('Raw received:', receivedData); // Debug: xem chính xác cấu trúc
+private handleServerResponse(receivedData: any) {
+    console.log('Raw received:', receivedData); // Debug: xem chính xác cấu trúc
 
-        // QUAN TRỌNG: Server luôn bọc trong { action: "onchat", data: { ... } }
-        const payload = receivedData.action === 'onchat' ? receivedData.data : receivedData;
+    // QUAN TRỌNG: Server luôn bọc trong { action: "onchat", data: { ... } } hoặc gửi thẳng data
+    const payload = receivedData.action === 'onchat' ? receivedData.data : receivedData;
+    const event = payload.event;
+    const status = payload.status;
+    const responseData = payload.data;
 
-        const event = payload.event;
-        const status = payload.status;
-        const responseData = payload.data;
+    console.log('Processed payload:', { event, status, responseData }); // Debug
 
-        console.log('Processed payload:', { event, status, responseData }); // Debug
+    if (status === 'success') {
+        switch (event) {
+            case 'LOGIN':
+            case 'RE_LOGIN':
+                const reLoginCode = responseData?.RE_LOGIN_CODE;
+                const username = localStorage.getItem('username') || '';
+                store.dispatch(loginSuccess({
+                    user: { username },
+                    reLoginCode: reLoginCode,
+                }));
+                console.log('✅ Login/Relogin success, code:', reLoginCode);
+                // Gọi lấy danh sách user NGAY SAU KHI LOGIN HOẶC RELOGIN THÀNH CÔNG
+                this.getUserList();
+                break;
 
-        if (status === 'success') {
-            switch (event) {
-                case 'LOGIN':
-                case 'RE_LOGIN':
-                    const reLoginCode = responseData?.RE_LOGIN_CODE;
-                    const username = localStorage.getItem('username') || '';
+            case 'REGISTER':
+                const registerCode = responseData?.RE_LOGIN_CODE;
+                const registerUser = localStorage.getItem('username') || '';
+                store.dispatch(registerSuccess({
+                    user: { username: registerUser },
+                    reLoginCode: registerCode,
+                }));
+                console.log('Register success');
+                break;
 
-                    store.dispatch(loginSuccess({
-                        user: { username },
-                        reLoginCode: reLoginCode,
-                    }));
-                    console.log('✅ Login/Relogin success, code:', reLoginCode);
+            case 'GET_USER_LIST':
+                if (Array.isArray(responseData)) {
+                    store.dispatch(setUserList(responseData));
+                    console.log('✅ Đã nhận danh sách user:', responseData.map((u: any) => u.name).join(', '));
+                } else {
+                    console.warn('GET_USER_LIST data không hợp lệ:', responseData);
+                }
+                break;
 
-                    // Gọi lấy danh sách user NGAY SAU KHI LOGIN HOẶC RELOGIN THÀNH CÔNG
-                    this.getUserList();
-                    break;
+            case 'GET_PEOPLE_CHAT_MES':
+                const historyData = responseData;
+                console.log("Server trả về lịch sử chat raw:", historyData);
+                if (Array.isArray(historyData)) {
+                    const sortedMessages = [...historyData].reverse();
+                    store.dispatch(setMessages(sortedMessages));
+                    console.log("Đã tải lịch sử chat:", sortedMessages.length, "tin nhắn");
+                }
+                break;
 
-                case 'REGISTER':
-                    const registerCode = responseData?.RE_LOGIN_CODE;
-                    const registerUser = localStorage.getItem('username') || '';
+            case 'SEND_CHAT':
+                if (responseData) {
+                    store.dispatch(addMessage(responseData));
+                }
+                break;
 
-                    store.dispatch(registerSuccess({
-                        user: { username: registerUser },
-                        reLoginCode: registerCode,
-                    }));
-                    console.log('Register success');
-                    break;
-
-                case 'GET_USER_LIST':
-                    if (Array.isArray(responseData)) {
-                        store.dispatch(setUserList(responseData));
-                        console.log('✅ Đã nhận danh sách user:', responseData.map((u: any) => u.name).join(', '));
-                    } else {
-                        console.warn('GET_USER_LIST data không hợp lệ:', responseData);
-                    }
-                    break;
-
-                default:
-                    console.log('Event khác (chat, room,...):', event);
-                    break;
-            }
-        } else if (status === 'error') {
-            const errorMessage = payload.mes || 'Có lỗi xảy ra';
-            console.error('Server error:', errorMessage);
-
-            if (event === 'LOGIN' || event === 'RE_LOGIN' || event === 'REGISTER') {
-                store.dispatch(loginFailure(errorMessage));
-            }
+            default:
+                console.log('Event khác:', event);
+                break;
         }
+    } else if (status === 'error') {
+        const errorMessage = payload.mes || 'Có lỗi xảy ra';
+        console.error('Server error:', errorMessage);
+
+        // Xử lý đặc biệt khi hết hạn đăng nhập
+        if (errorMessage === 'User not Login') {
+            console.warn('⚠️ Server báo chưa đăng nhập. Đang tự động đăng nhập lại...');
+            const user = localStorage.getItem('username');
+            const code = localStorage.getItem('reLoginCode');
+            if (user && code) {
+                this.reLogin(user, code);
+            } else {
+                store.dispatch(loginFailure("Phiên đăng nhập hết hạn"));
+            }
+            return;
+        }
+
+        // Xử lý lỗi login/register
+        if (event === 'LOGIN' || event === 'RE_LOGIN' || event === 'REGISTER') {
+            store.dispatch(loginFailure(errorMessage));
+        }
+    }
+}
     }
 
   /**
@@ -137,10 +236,9 @@ class SocketService {
         action: 'onchat',
         data: payload
       });
-      console.log('Sending:', message);
       this.socket.send(message);
     } else {
-      console.error('Socket not conected');
+      console.error('Socket not connected');
       throw new Error('WebSocket chưa kết nối');
     }
   }
@@ -148,7 +246,12 @@ class SocketService {
 
 
   // đăng ký
-  register(user: string, pass: string) {
+  async register(user: string, pass: string) {
+    // Đợi connection ready nếu đang kết nối
+    if (this.connectionReady) {
+      await this.connectionReady;
+    }
+    
     // Lưu username vào localStorage để dùng khi nhận response
     localStorage.setItem('username', user);
 
@@ -162,7 +265,12 @@ class SocketService {
   }
 
   // đăng nhập
-  login(user: string, pass: string) {
+  async login(user: string, pass: string) {
+    // Đợi connection ready nếu đang kết nối
+    if (this.connectionReady) {
+      await this.connectionReady;
+    }
+    
     // Lưu username vào localStorage để dùng khi nhận response
     localStorage.setItem('username', user);
     this.send({
@@ -183,6 +291,20 @@ class SocketService {
         code: code
       }
     });
+  }
+
+
+  // Đăng xuất
+  logout() {
+    // Chỉ gửi LOGOUT event nếu socket đã kết nối
+    if (this.socket && this.socket.readyState === WebSocket.OPEN) {
+      this.send({
+        event: 'LOGOUT'
+      });
+    } else {
+      // Nếu socket chưa kết nối, chỉ log warning, không throw error
+      console.warn('Socket not connected, skipping LOGOUT event');
+    }
   }
 
   // chat với người 
@@ -270,6 +392,25 @@ class SocketService {
             data: { user: username }
         });
     }
+
+  /**
+   * Reconnect to WebSocket server
+   */
+  reconnect(): Promise<void> {
+    if (this.retryCount >= MAX_RETRY_ATTEMPTS) {
+      const errorMsg = `Không thể kết nối sau ${MAX_RETRY_ATTEMPTS} lần thử. Vui lòng kiểm tra kết nối mạng và thử lại sau.`;
+      store.dispatch(socketConnectionError(errorMsg));
+      return Promise.reject(new Error(errorMsg));
+    }
+
+    this.retryCount++;
+
+    // Disconnect existing connection if any
+    this.disconnect();
+
+    // Try to connect again
+    return this.connect();
+  }
 }
 
 export const socketService = new SocketService();

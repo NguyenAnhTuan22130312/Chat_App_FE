@@ -1,10 +1,14 @@
-import React from 'react';
+import { useAppSelector } from '../../hooks/reduxHooks';
 
 export default function ChatHeader() {
+
+  const { currentPartner } = useAppSelector(state => state.chat);
+
+
   return (
     <div className="h-[60px] border-b border-gray-300 flex items-center justify-between px-4 bg-white shadow-sm">
       <div className="flex flex-col items-center w-full">
-        <h2 className="text-[17px] font-bold text-gray-900">Sơn Tùng MTP</h2>
+        <h2 className="text-[17px] font-bold text-gray-900">{currentPartner || "Đang chọn..."}</h2>
         <span className="text-[13px] text-gray-500">Active</span>
       </div>
       <div className="absolute right-4 flex space-x-3 text-[#0084ff]">

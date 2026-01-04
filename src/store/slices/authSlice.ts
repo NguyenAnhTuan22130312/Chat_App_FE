@@ -10,6 +10,9 @@ interface AuthState {
     reLoginCode: string | null;
     loading: boolean;
     error: string | null;
+    registerSuccess: boolean;
+    socketConnected: boolean;
+    socketConnectionError: string | null;
 }
 
 // State ban đầu khi project khởi động
@@ -19,6 +22,9 @@ const initialState: AuthState = {
     reLoginCode: null,       // ← Không load từ localStorage
     loading: false,
     error: null,
+    registerSuccess: false,
+    socketConnected: false,
+    socketConnectionError: null,
 };
 
 const authSlice = createSlice({
@@ -55,19 +61,10 @@ const authSlice = createSlice({
             state.error = action.payload;
         },
 
-        // Đăng ký thành công
-        // Auto chuyển sang trạng thái đã đăng nhập hoặc yêu cầu login
-        registerSuccess: (state, action: PayloadAction<{ user: User; reLoginCode?: string }>) => {
+        registerSuccess: (state) => {
             state.loading = false;
-            state.isAuthenticated = true;
-            state.user = action.payload.user;
-
-            if (action.payload.reLoginCode) {
-                state.reLoginCode = action.payload.reLoginCode;
-                localStorage.setItem('reLoginCode', action.payload.reLoginCode);
-                localStorage.setItem('username', action.payload.user.username);
-            }
             state.error = null;
+            state.registerSuccess = true;
         },
 
         // Đăng xuất
@@ -83,10 +80,24 @@ const authSlice = createSlice({
         clearError: (state) => {
             state.error = null;
         },
+
+        // WebSocket connection actions
+        socketConnected: (state) => {
+            state.socketConnected = true;
+            state.socketConnectionError = null;
+        },
+
+        socketDisconnected: (state) => {
+            state.socketConnected = false;
+        },
+
+        socketConnectionError: (state, action: PayloadAction<string>) => {
+            state.socketConnected = false;
+            state.socketConnectionError = action.payload;
+        },
     },
 });
 
-// Export actions dùng cho components
 export const {
     loginRequest,
     loginSuccess,
@@ -94,6 +105,9 @@ export const {
     registerSuccess,
     logout,
     clearError,
+    socketConnected,
+    socketDisconnected,
+    socketConnectionError,
 } = authSlice.actions;
 
 // Export reducer để add vào store
