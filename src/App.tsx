@@ -87,14 +87,12 @@ function App() {
     const socketConnectionError = useAppSelector((state) => state.auth.socketConnectionError);
 
     useEffect(() => {
-        // Hàm async để đợi WebSocket kết nối
         const initializeConnection = async () => {
             try {
                 await socketService.connect();
                 
                 // Chỉ auto-login nếu đã authenticated
                 if (isAuthenticated) {
-                    // Kiểm tra có RE_LOGIN_CODE trong localStorage không
                     const reLoginCode = localStorage.getItem('reLoginCode');
                     const username = localStorage.getItem('username');
 
@@ -130,7 +128,7 @@ function App() {
                 <Route
                     path="/login"
                     element={
-                        isAuthenticated ? <Navigate to="/" replace/> : <Login/>
+                        isAuthenticated ? <Navigate to="/" replace /> : <Login />
                     }
                 />
 
@@ -138,7 +136,7 @@ function App() {
                 <Route
                     path="/register"
                     element={
-                        isAuthenticated ? <Navigate to="/" replace/> : <Register/>
+                        isAuthenticated ? <Navigate to="/" replace /> : <Register />
                     }
                 />
 

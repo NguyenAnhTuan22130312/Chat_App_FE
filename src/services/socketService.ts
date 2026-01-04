@@ -6,6 +6,7 @@ import {
   socketDisconnected,
   socketConnectionError
 } from "../store/slices/authSlice";
+import { addMessage, setMessages } from "../store/slices/chatSlice";
 import {store} from "../store/store";
 
 const SOCKET_URL = 'wss://chat.longapp.site/chat/chat';
@@ -29,6 +30,13 @@ class SocketService {
     if (onMessageReceived) {
       this.messageCallback = onMessageReceived;
     }
+    if (this.socket && this.socket.readyState === WebSocket.OPEN) {
+      return Promise.resolve();
+  }
+
+  if (this.connectionReady) {
+      return this.connectionReady;
+  }
 
     // Tạo Promise để đợi connection
     this.connectionReady = new Promise((resolve, reject) => {
@@ -42,11 +50,11 @@ class SocketService {
         const errorMsg = 'Không thể kết nối đến máy chủ. Vui lòng kiểm tra kết nối mạng.';
         console.error('WebSocket connection timeout');
         store.dispatch(socketConnectionError(errorMsg));
-        
+
         if (this.rejectConnection) {
           this.rejectConnection(new Error(errorMsg));
         }
-        
+
         // Close socket nếu đang pending
         if (this.socket) {
           this.socket.close();
@@ -62,13 +70,13 @@ class SocketService {
         clearTimeout(this.connectionTimeout);
         this.connectionTimeout = null;
       }
-      
+
       // Reset retry count on successful connection
       this.retryCount = 0;
-      
+
       // Dispatch Redux action
       store.dispatch(socketConnected());
-      
+
       this.messageCallback({ status: 'Connected to server' });
       
       // Resolve Promise khi connection ready
@@ -93,16 +101,16 @@ class SocketService {
 
     this.socket.onerror = (error) => {
       console.error('WebSocket Error:', error);
-      
+
       // Clear timeout
       if (this.connectionTimeout) {
         clearTimeout(this.connectionTimeout);
         this.connectionTimeout = null;
       }
-      
+
       const errorMsg = 'Lỗi kết nối WebSocket. Vui lòng thử lại.';
       store.dispatch(socketConnectionError(errorMsg));
-      
+
       if (this.rejectConnection) {
         this.rejectConnection(new Error(errorMsg));
       }
@@ -114,10 +122,10 @@ class SocketService {
         clearTimeout(this.connectionTimeout);
         this.connectionTimeout = null;
       }
-      
+
       // Dispatch Redux action
       store.dispatch(socketDisconnected());
-      
+
       this.connectionReady = null;
       this.resolveConnection = null;
       this.rejectConnection = null;
@@ -152,6 +160,22 @@ class SocketService {
           // register success
               store.dispatch(registerSuccess());
               break;
+              case "GET_PEOPLE_CHAT_MES":
+          const historyData = data.data;
+          console.log("Server trả về lịch sử chat raw:", historyData);
+          if (Array.isArray(historyData)) {
+            const sortedMessages = [...historyData].reverse();
+            store.dispatch(setMessages(sortedMessages));
+
+            console.log("Đã tải lịch sử chat:", sortedMessages.length, "tin nhắn");
+          }
+          break;
+
+              case "SEND_CHAT":
+                if (data.data) {
+                  store.dispatch(addMessage(data.data));
+                }
+                break;
 
         default:
           // Các event khác (chat, vv...)
@@ -160,6 +184,20 @@ class SocketService {
     } else if (status === 'error') {
       // Xử lý error
       const errorMessage = data.mes || 'Có lỗi xảy ra';
+
+      if (errorMessage === 'User not Login') {
+        console.warn('⚠️ Server báo chưa đăng nhập. Đang tự động đăng nhập lại...');
+
+        const user = localStorage.getItem('username');
+        const code = localStorage.getItem('reLoginCode');
+
+        if (user && code) {
+            this.reLogin(user, code);
+        } else {
+             store.dispatch(loginFailure("Phiên đăng nhập hết hạn"));
+        }
+        return;
+    }
 
       if (event === 'LOGIN' || event === 'RE_LOGIN' || event === 'REGISTER') {
         store.dispatch(loginFailure(errorMessage));
@@ -286,12 +324,12 @@ class SocketService {
       store.dispatch(socketConnectionError(errorMsg));
       return Promise.reject(new Error(errorMsg));
     }
-    
+
     this.retryCount++;
-    
+
     // Disconnect existing connection if any
     this.disconnect();
-    
+
     // Try to connect again
     return this.connect();
   }
