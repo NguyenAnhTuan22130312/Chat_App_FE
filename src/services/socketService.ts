@@ -102,15 +102,15 @@ class SocketService {
               console.log('Register success');
               break;
               case "GET_PEOPLE_CHAT_MES":
-                const historyData = data.data;
-                console.log("Server trả về lịch sử chat raw:", historyData);
-                if (Array.isArray(data.data)) {
-                  const sortedMessages = [...historyData].reverse();
-                   store.dispatch(setMessages(data.data));
-                   
-                   console.log("Đã tải lịch sử chat:", data.data.length, "tin nhắn");
-                }
-                break;
+          const historyData = data.data;
+          console.log("Server trả về lịch sử chat raw:", historyData);
+          if (Array.isArray(historyData)) {
+            const sortedMessages = [...historyData].reverse();
+            store.dispatch(setMessages(sortedMessages)); 
+            
+            console.log("Đã tải lịch sử chat:", sortedMessages.length, "tin nhắn");
+          }
+          break;
       
               case "SEND_CHAT":
                 if (data.data) {
@@ -119,7 +119,7 @@ class SocketService {
                 break;
 
         default:
-          // Các event != (chat, vv...)
+
           break;
       }
     } else if (status === 'error') {

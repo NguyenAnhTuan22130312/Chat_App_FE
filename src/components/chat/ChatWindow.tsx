@@ -5,9 +5,10 @@ import ChatInput from './ChatInput';
 import { useAppSelector } from '../../hooks/reduxHooks'; 
 import { socketService } from '../../services/socketService';
 
+
 export default function ChatWindow() {
 
-  const { user } = useAppSelector((state) => state.auth);
+  const { user,isAuthenticated } = useAppSelector((state) => state.auth);
   const myUsername = user?.username;
   const { messages, currentPartner } = useAppSelector((state) => state.chat);
   const messagesEndRef = useRef<HTMLDivElement>(null);
@@ -16,13 +17,16 @@ export default function ChatWindow() {
     const initChat = async () => {
       await socketService.connect();
 
-    if (myUsername) {
-       console.log(`Bắt đầu lấy tin nhắn với ${currentPartner}`);
-       socketService.getHistory(currentPartner);
-    }
-  };
+      if (myUsername && currentPartner && isAuthenticated) {
+        console.log('Đợi 500ms để đảm bảo socket đã Re-Login...');
+        setTimeout(() => {
+           console.log(`Bắt đầu lấy tin nhắn với ${currentPartner}`);
+           socketService.getHistory(currentPartner);
+        }, 500); 
+     }
+   };
   initChat();
-  }, [currentPartner, myUsername]);
+  }, [currentPartner, myUsername,isAuthenticated]);
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
