@@ -2,6 +2,7 @@ import {createSlice, PayloadAction} from "@reduxjs/toolkit";
 
 interface User {
     username: string;
+    avatar?: string;
 }
 
 interface AuthState {
@@ -52,6 +53,12 @@ const authSlice = createSlice({
             }
             state.error = null;
         },
+        updateAvatar: (state, action: PayloadAction<string>) => {
+            if (state.user) {
+              state.user.avatar = action.payload;
+              localStorage.setItem('user_avatar', action.payload);
+            }
+          },
 
         // Đăng nhập failure
         loginFailure: (state, action: PayloadAction<string>) => {
@@ -108,6 +115,7 @@ export const {
     socketConnected,
     socketDisconnected,
     socketConnectionError,
+    updateAvatar,
 } = authSlice.actions;
 
 // Export reducer để add vào store

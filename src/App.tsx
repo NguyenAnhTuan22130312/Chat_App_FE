@@ -10,11 +10,13 @@ import {socketService} from "./services/socketService";
 import {loginRequest, logout} from "./store/slices/authSlice";
 import {store} from "./store/store";
 import Sidebar from './components/sidebar/Sidebar';
+import Profile from './screens/Profile';
 
 // Component for Home layout with Sidebar
 function HomeLayout() {
     const dispatch = useAppDispatch();
     const navigate = useNavigate();
+    const { user } = useAppSelector((state) => state.auth);
     const username = useAppSelector((state) => state.auth.user?.username);
 
     const handleLogout = () => {
@@ -39,9 +41,29 @@ function HomeLayout() {
                         <p className="text-sm text-gray-600 mt-1">Xin chào, {username}</p>
                     )}
                 </div>
-
+                <img 
+                        src={user?.avatar || "https://i.pravatar.cc/150?img=3"} 
+                        alt="My Avatar"
+                        className="w-10 h-10 rounded-full object-cover border border-gray-300" 
+                    />
                 {/* Sidebar Content - Chat list area */}
                 <div className="flex-1 overflow-y-auto p-4">
+
+                <div 
+                        onClick={() => navigate('/profile')}
+                        className="mb-4 flex items-center p-3 bg-white rounded-xl shadow-sm cursor-pointer hover:bg-blue-50 transition-colors border border-transparent hover:border-blue-200"
+                    >
+                        <div className="p-2 bg-blue-100 rounded-full text-blue-600 mr-3">
+                            <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
+                            </svg>
+                        </div>
+                        <div>
+                            <p className="font-semibold text-gray-800">Thông tin cá nhân</p>
+                            <p className="text-xs text-gray-500">Đổi avatar, xem thông tin</p>
+                        </div>
+                    </div>
+
                     <span className="text-gray-400 text-sm">
                         Sidebar Area <br/> (Danh sách chat - Trung Han)
                     </span>
@@ -130,6 +152,11 @@ function App() {
                     element={
                         isAuthenticated ? <Navigate to="/" replace /> : <Register />
                     }
+                />
+
+                <Route 
+                    path="/profile" 
+                    element={isAuthenticated ? <Profile /> : <Navigate to="/login" replace />} 
                 />
 
                 {/* Protected Route - Trang Home/Chat */}
