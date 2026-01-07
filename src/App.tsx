@@ -7,14 +7,17 @@ import LoadingScreen from './components/common/LoadingScreen';
 import ConnectionErrorScreen from './components/common/ConnectionErrorScreen';
 import {useAppSelector, useAppDispatch} from "./hooks/reduxHooks";
 import {socketService} from "./services/socketService";
-import {loginRequest, logout} from "./store/slices/authSlice";
+import {loginRequest, logout,fetchUserAvatar} from "./store/slices/authSlice";
 import {store} from "./store/store";
 import Sidebar from './components/sidebar/Sidebar';
+import Profile from './screens/Profile';
+
 
 // Component for Home layout with Sidebar
 function HomeLayout() {
     const dispatch = useAppDispatch();
     const navigate = useNavigate();
+    const { user } = useAppSelector((state) => state.auth);
     const username = useAppSelector((state) => state.auth.user?.username);
 
     const handleLogout = () => {
@@ -33,15 +36,25 @@ function HomeLayout() {
             {/* Sidebar */}
             <div className="w-[360px] h-full bg-gray-100 border-r border-gray-300 hidden md:flex flex-col">
                 {/* Sidebar Header */}
-                <div className="p-4 border-b border-gray-300">
+                <div className="p-4 border-b border-gray-300 flex items-center justify-between">
+                    <div>
                     <h2 className="text-lg font-bold text-gray-800">Chat App</h2>
                     {username && (
                         <p className="text-sm text-gray-600 mt-1">Xin chào, {username}</p>
                     )}
+                    </div>
+                <img 
+                        src={user?.avatar || "https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcT7imMwm5oKZ8t3qnhAptR3ZzpD-i2AuSiHoQ&s"} 
+                        alt="My Avatar"
+                        className="w-12 h-12 rounded-full object-cover border border-gray-300 ml-3" 
+                    />
                 </div>
-
+                
                 {/* Sidebar Content - Chat list area */}
                 <div className="flex-1 overflow-y-auto p-4">
+
+                
+
                     <span className="text-gray-400 text-sm">
                         Sidebar Area <br/> (Danh sách chat - Trung Han)
                     </span>
@@ -49,6 +62,21 @@ function HomeLayout() {
 
                 {/* Logout Button at bottom */}
                 <div className="p-4 border-t border-gray-300">
+                <div 
+                        onClick={() => navigate('/profile')}
+                        className="mb-4 flex items-center p-3 bg-white rounded-xl shadow-sm cursor-pointer hover:bg-blue-50 transition-colors border border-transparent hover:border-blue-200"
+                    >
+                        <div className="p-2 bg-blue-100 rounded-full text-blue-600 mr-3">
+                            <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
+                            </svg>
+                        </div>
+                        <div>
+                            <p className="font-semibold text-gray-800">Thông tin cá nhân</p>
+                            <p className="text-xs text-gray-500">Đổi avatar, xem thông tin</p>
+                        </div>
+                    </div>
+
                     <button
                         onClick={handleLogout}
                         className="w-full py-2 px-4 bg-red-500 hover:bg-red-600 text-white font-semibold rounded-lg transition-colors duration-200 flex items-center justify-center gap-2"
@@ -82,6 +110,7 @@ function App() {
     const isAuthenticated = useAppSelector((state) => state.auth.isAuthenticated);
     const socketConnected = useAppSelector((state) => state.auth.socketConnected);
     const socketConnectionError = useAppSelector((state) => state.auth.socketConnectionError);
+    const dispatch = useAppDispatch();
 
     useEffect(() => {
         const initializeConnection = async () => {
@@ -91,7 +120,10 @@ function App() {
             if (isAuthenticated) {
                 const reLoginCode = localStorage.getItem('reLoginCode');
                 const username = localStorage.getItem('username');
-
+                const savedUsername = localStorage.getItem('username');
+                if (savedUsername) {
+                    dispatch(fetchUserAvatar(savedUsername));
+                }
                 if (reLoginCode && username) {
                     // Tự động đăng nhập lại
                     store.dispatch(loginRequest());
@@ -130,6 +162,11 @@ function App() {
                     element={
                         isAuthenticated ? <Navigate to="/" replace /> : <Register />
                     }
+                />
+
+                <Route 
+                    path="/profile" 
+                    element={isAuthenticated ? <Profile /> : <Navigate to="/login" replace />} 
                 />
 
                 {/* Protected Route - Trang Home/Chat */}
