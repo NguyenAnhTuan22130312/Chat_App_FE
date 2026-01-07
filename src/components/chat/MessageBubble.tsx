@@ -1,4 +1,5 @@
 import React from 'react';
+import { replaceEmojiShortcodes } from '../../utils/emojiShortcodes';
 
 interface MessageBubbleProps {
   text: string;
@@ -19,7 +20,64 @@ export default function MessageBubble({ text, isMe, avatar }: MessageBubbleProps
     return hasImageExtension || isKnownImageHost;
   };
 
-  const isImage = isImageUrl(text);
+  const parseMessage = (text: string) => {
+
+    if (isImageUrl(text)) {
+      return { type: 'image', content: text };
+    }
+
+    const hasMarkdown = /\*\*|\*|__/.test(text);
+    const hasEmoji = /:.+?:/.test(text);
+    const hasColor = /\[red]|\[blue]|\[green]|\[yellow]|\[purple]|\[orange]|\[pink]|\[brown]|\[gray]|\[black]/.test(text);
+
+    if (hasMarkdown || hasEmoji || hasColor) {
+      let parsed = text;
+      
+      // chuyển đổi emoji shortcode thành emoji
+      parsed = replaceEmojiShortcodes(parsed);
+      
+      return { type: 'markdown', content: parsed };
+    }
+
+    return { type: 'plain', content: text };
+  };
+
+  const renderMarkdown = (text: string) => {
+    let html = text;
+    
+    // Color tags: [color]text[/color]
+    const colorMap: Record<string, string> = {
+      red: '#FF0000',
+      blue: '#0084FF',
+      green: '#00C851',
+      yellow: '#FFD700',
+      purple: '#9C27B0',
+      orange: '#FF9800',
+      pink: '#E91E63',
+      brown: '#795548',
+      gray: '#9E9E9E',
+      black: '#000000',
+    };
+    
+    Object.entries(colorMap).forEach(([name, hex]) => {
+      const regex = new RegExp(`\\[${name}\\](.+?)\\[\\/${name}\\]`, 'g');
+      html = html.replace(regex, `<span style="color:${hex}">$1</span>`);
+    });
+    
+    // Bold: **text**
+    html = html.replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>');
+    
+    // Italic: *text*
+    html = html.replace(/\*(.+?)\*/g, '<em>$1</em>');
+    
+    // Underline: __text__
+    html = html.replace(/__(.+?)__/g, '<u>$1</u>');
+
+    return <span dangerouslySetInnerHTML={{ __html: html }} className="whitespace-pre-wrap" />;
+  };
+
+  const message = parseMessage(text);
+  const isImage = message.type === 'image';
 
   return (
     <div className={`flex items-end mb-2 ${isMe ? 'justify-end' : 'justify-start'}`}>
@@ -41,11 +99,11 @@ export default function MessageBubble({ text, isMe, avatar }: MessageBubbleProps
               )
         }`}
       >
-        {isImage ? (
+        {message.type === 'image' ? (
           <img 
-            src={text} 
+            src={message.content} 
             alt="Sent content" 
-            onClick={() => window.open(text, '_blank')}
+            onClick={() => window.open(message.content, '_blank')}
             className={`
               block max-w-full h-auto max-h-[350px] object-contain cursor-pointer
               border border-gray-200 hover:opacity-95 transition-opacity
@@ -53,12 +111,14 @@ export default function MessageBubble({ text, isMe, avatar }: MessageBubbleProps
             `}
             onError={(e) => {
                 e.currentTarget.style.display = 'none';
-                e.currentTarget.parentElement!.innerText = text; 
+                e.currentTarget.parentElement!.innerText = message.content; 
                 e.currentTarget.parentElement!.className += isMe ? ' bg-[#0084ff] text-white px-4 py-2' : ' bg-[#e4e6eb] text-black px-4 py-2';
             }}
           />
+        ) : message.type === 'markdown' ? (
+          renderMarkdown(message.content)
         ) : (
-          <span className="whitespace-pre-wrap">{text}</span>
+          <span className="whitespace-pre-wrap">{message.content}</span>
         )}
       </div>
     </div>
