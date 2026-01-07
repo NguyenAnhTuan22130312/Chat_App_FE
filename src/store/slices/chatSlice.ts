@@ -14,7 +14,7 @@ interface ChatState {
 
 const initialState: ChatState = {
   messages: [],
-  currentPartner: "tuantest",
+  currentPartner: "anhtuan12",
 };
 
 const chatSlice = createSlice({

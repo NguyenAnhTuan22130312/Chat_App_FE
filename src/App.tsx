@@ -18,18 +18,14 @@ function HomeLayout() {
     const username = useAppSelector((state) => state.auth.user?.username);
 
     const handleLogout = () => {
-        try {
-            // Gọi API LOGOUT qua socket (sẽ skip nếu socket chưa ready)
-            socketService.logout();
-        } catch (error) {
-            console.error('Error during logout:', error);
-        }
+        // Gọi API LOGOUT qua socket
+        socketService.logout();
         
-        // Dispatch logout action để clear state
+        // Dispatch logout action để xoá state
         dispatch(logout());
         
-        // Navigate về trang login
-        navigate('/login');
+        // Tải lại trang để kết nối lại WebSocket
+        window.location.reload();
     };
 
     return (
@@ -89,39 +85,34 @@ function App() {
 
     useEffect(() => {
         const initializeConnection = async () => {
-            try {
-                await socketService.connect();
-                
-                // Chỉ auto-login nếu đã authenticated
-                if (isAuthenticated) {
-                    const reLoginCode = localStorage.getItem('reLoginCode');
-                    const username = localStorage.getItem('username');
+            await socketService.connect();
+            
+            // Chỉ tự động đăng nhập nếu đã xác thực
+            if (isAuthenticated) {
+                const reLoginCode = localStorage.getItem('reLoginCode');
+                const username = localStorage.getItem('username');
 
-                    if (reLoginCode && username) {
-                        // Tự động đăng nhập lại
-                        store.dispatch(loginRequest());
-                        socketService.reLogin(username, reLoginCode);
-                    }
+                if (reLoginCode && username) {
+                    // Tự động đăng nhập lại
+                    store.dispatch(loginRequest());
+                    socketService.reLogin(username, reLoginCode);
                 }
-            } catch (error) {
-                console.error('Failed to initialize WebSocket connection:', error);
             }
         };
 
         initializeConnection();
     }, [isAuthenticated]);
 
-    // Show loading screen while connecting
+    // Hiển thị màn hình loading khi chờ kết nối
     if (!socketConnected && !socketConnectionError) {
         return <LoadingScreen />;
     }
 
-    // Show error screen if connection failed
+    // Hiển thị lỗi nếu lỗi kết nối
     if (socketConnectionError) {
         return <ConnectionErrorScreen errorMessage={socketConnectionError} />;
     }
 
-    // Show main app when connected
     return (
         <Router>
             <Routes>

@@ -20,7 +20,6 @@ const RegisterForm: React.FC = () => {
     const dispatch = useAppDispatch();
     const {loading, error, registerSuccess} = useAppSelector((state) => state.auth);
 
-    // Clear error khi component mount
     useEffect(() => {
         dispatch(clearError());
     }, [dispatch]);
@@ -47,8 +46,7 @@ const RegisterForm: React.FC = () => {
         }
     }, [registerSuccess, navigate]);
 
-    // User icon SVG
-    const UserIcon = () => (
+       const UserIcon = () => (
         <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"
              strokeLinecap="round" strokeLinejoin="round">
             <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path>
@@ -56,8 +54,7 @@ const RegisterForm: React.FC = () => {
         </svg>
     );
 
-    // Lock icon SVG
-    const LockIcon = () => (
+        const LockIcon = () => (
         <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"
              strokeLinecap="round" strokeLinejoin="round">
             <rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect>
@@ -65,8 +62,7 @@ const RegisterForm: React.FC = () => {
         </svg>
     );
 
-    // Eye icon SVG
-    const EyeIcon = ({isOpen}: { isOpen: boolean }) => (
+        const EyeIcon = ({isOpen}: { isOpen: boolean }) => (
         isOpen ? (
             <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"
                  strokeLinecap="round" strokeLinejoin="round">
@@ -97,7 +93,6 @@ const RegisterForm: React.FC = () => {
             return;
         }
 
-        // Dispatch action để set loading state
         dispatch(loginRequest());
 
         // Gọi socketService để gửi packet REGISTER
@@ -108,7 +103,7 @@ const RegisterForm: React.FC = () => {
         }
     };
 
-    // Enter key handlers - Chuyển sang field tiếp theo
+    // Chuyển sang field tiếp theo
     const handleUsernameKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
         if (e.key === 'Enter') {
             e.preventDefault();
@@ -136,14 +131,12 @@ const RegisterForm: React.FC = () => {
                     Điền thông tin tại đây để bắt đầu nhé :))))))
                 </p>
 
-                {/* Error Message */}
                 {error && (
                     <div className="mb-5 p-3 bg-red-50 border border-red-200 rounded-lg">
                         <p className="text-sm text-red-600 text-center">{error}</p>
                     </div>
                 )}
 
-                {/* Success Message */}
                 {registerSuccess && (
                     <div className="mb-5 p-3 bg-green-50 border border-green-200 rounded-lg">
                         <p className="text-sm text-green-600 text-center">
@@ -152,7 +145,6 @@ const RegisterForm: React.FC = () => {
                     </div>
                 )}
 
-                {/* Username Field */}
                 <div className="mb-5">
                     <label className="block text-base font-medium text-gray-700 mb-2">
                         Tên đăng nhập
@@ -175,7 +167,6 @@ const RegisterForm: React.FC = () => {
                     </div>
                 </div>
 
-                {/* Password Field */}
                 <div className="mb-5">
                     <label className="block text-base font-medium text-gray-700 mb-2">
                         Mật khẩu
@@ -205,7 +196,6 @@ const RegisterForm: React.FC = () => {
                     </div>
                 </div>
 
-                {/* Confirm Password Field */}
                 <div className="mb-7">
                     <label className="block text-base font-medium text-gray-700 mb-2">
                         Xác nhận mật khẩu
@@ -233,7 +223,6 @@ const RegisterForm: React.FC = () => {
                     </div>
                 </div>
 
-                {/* Register Button */}
                 <button
                     type="submit"
                     disabled={loading}
@@ -242,7 +231,6 @@ const RegisterForm: React.FC = () => {
                     {loading ? 'Đang đăng ký...' : 'Đăng ký'}
                 </button>
 
-                {/* Login Link */}
                 <div className="text-center text-[15px] text-gray-600">
                     Đã có tài khoản? <Link to="/login"
                                            className="text-primary no-underline cursor-pointer font-semibold transition-opacity duration-200 hover:opacity-70 hover:underline">Đăng

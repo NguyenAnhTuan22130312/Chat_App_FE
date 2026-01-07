@@ -11,34 +11,24 @@ import {store} from "../store/store";
 import {setUserList} from "../store/slices/userListSlice";
 
 const SOCKET_URL = 'wss://chat.longapp.site/chat/chat';
-const CONNECTION_TIMEOUT = 30000; // 30s
-const MAX_RETRY_ATTEMPTS = 3;
-const HEARTBEAT_INTERVAL = 30000; // 30s - ping mỗi 30s để keep alive
-const RECONNECT_DELAY = 3000; // 3s - delay trước khi reconnect
-const MAX_RECONNECT_ATTEMPTS = 5; // Số lần thử reconnect tối đa
+const HEARTBEAT_INTERVAL = 30000; // ping mỗi 30s để giữ kế nối server
+const RECONNECT_DELAY = 3000;
+const MAX_RECONNECT_ATTEMPTS = 5;
 
 class SocketService {
     private socket: WebSocket | null = null;
-    private messageCallback: (data: any) => void = () => {
-    };
     private connectionReady: Promise<void> | null = null;
     private resolveConnection: (() => void) | null = null;
     private rejectConnection: ((error: Error) => void) | null = null;
-    private connectionTimeout: NodeJS.Timeout | null = null;
-    private retryCount: number = 0;
-    // Auto-reconnect and heartbeat properties
     private heartbeatInterval: NodeJS.Timeout | null = null;
     private shouldReconnect: boolean = true;
     private reconnectAttempts: number = 0;
 
-    /**
+    /*
      * kết nối tới web socket
      * @param onMessageReceived - callback nhận message từ server (dùng cho custom handling)
      */
-    connect(onMessageReceived?: (data: any) => void): Promise<void> {
-        if (onMessageReceived) {
-            this.messageCallback = onMessageReceived;
-        }
+    connect(): Promise<void> {
         if (this.socket && this.socket.readyState === WebSocket.OPEN) {
             return Promise.resolve();
         }
@@ -53,113 +43,50 @@ class SocketService {
             this.rejectConnection = reject;
         });
 
-        // Set timeout cho connection
-        this.connectionTimeout = setTimeout(() => {
-            if (this.socket && this.socket.readyState !== WebSocket.OPEN) {
-                const errorMsg = 'Không thể kết nối đến máy chủ. Vui lòng kiểm tra kết nối mạng.';
-                console.error('WebSocket connection timeout');
-                store.dispatch(socketConnectionError(errorMsg));
-
-                if (this.rejectConnection) {
-                    this.rejectConnection(new Error(errorMsg));
-                }
-
-                // Close socket nếu đang pending
-                if (this.socket) {
-                    this.socket.close();
-                }
-            }
-        }, CONNECTION_TIMEOUT);
-
         this.socket = new WebSocket(SOCKET_URL);
 
         this.socket.onopen = () => {
-            // Clear timeout
-            if (this.connectionTimeout) {
-                clearTimeout(this.connectionTimeout);
-                this.connectionTimeout = null;
-            }
-
-            // Reset retry count on successful connection
-            this.retryCount = 0;
-            // Reset reconnect attempts
             this.reconnectAttempts = 0;
-
-            // Dispatch Redux action
             store.dispatch(socketConnected());
-
-            this.messageCallback({status: 'Connected to server'});
-
-            // Start heartbeat to keep connection alive
             this.startHeartbeat();
-
-            // Resolve Promise khi connection ready
             if (this.resolveConnection) {
                 this.resolveConnection();
             }
         };
 
         this.socket.onmessage = (event) => {
-            try {
-                const data = JSON.parse(event.data);
-
-                // Xử lý response và dispatch Redux actions tự động
-                this.handleServerResponse(data);
-
-                // Gọi callback nếu có
-                this.messageCallback(data);
-            } catch (error) {
-                console.error('Error parsing message:', error);
-            }
+            const data = JSON.parse(event.data);
+            this.handleServerResponse(data);
         };
 
         this.socket.onerror = (error) => {
-            console.error('WebSocket Error:', error);
-
-            // Clear timeout
-            if (this.connectionTimeout) {
-                clearTimeout(this.connectionTimeout);
-                this.connectionTimeout = null;
-            }
-
-            const errorMsg = 'Lỗi kết nối WebSocket. Vui lòng thử lại.';
+            console.error('Lỗi: ', error);
+            const errorMsg = 'Lỗi kết nối.';
             store.dispatch(socketConnectionError(errorMsg));
-
             if (this.rejectConnection) {
                 this.rejectConnection(new Error(errorMsg));
             }
         };
 
         this.socket.onclose = (event) => {
-            console.log('🔌 WebSocket closed:', event.code, event.reason);
+            console.log('Đóng kết nối:', event.code, event.reason);
 
-            // Stop heartbeat
             this.stopHeartbeat();
-
-            // Clear timeout
-            if (this.connectionTimeout) {
-                clearTimeout(this.connectionTimeout);
-                this.connectionTimeout = null;
-            }
-
-            // Dispatch Redux action
             store.dispatch(socketDisconnected());
-
             this.connectionReady = null;
             this.resolveConnection = null;
             this.rejectConnection = null;
 
-            // Auto-reconnect nếu được bật và chưa vượt quá số lần thử
+            // Tự động kết nối lại nếu được bật và chưa vượt quá số lần thử
             if (this.shouldReconnect && this.reconnectAttempts < MAX_RECONNECT_ATTEMPTS) {
                 this.reconnectAttempts++;
-                console.log(`🔄 Attempting to reconnect (${this.reconnectAttempts}/${MAX_RECONNECT_ATTEMPTS})...`);
+                console.log(`Số lần thử kết nối lại (${this.reconnectAttempts}/${MAX_RECONNECT_ATTEMPTS})...`);
 
                 setTimeout(() => {
                     this.attemptReconnect();
                 }, RECONNECT_DELAY);
             } else if (this.reconnectAttempts >= MAX_RECONNECT_ATTEMPTS) {
-                console.error('Max reconnection attempts reached');
-                store.dispatch(socketConnectionError('Không thể kết nối lại sau nhiều lần thử. Vui lòng tải lại trang.'));
+                store.dispatch(socketConnectionError('Không thể kết nối lại. Tải lại trang.'));
             }
         };
 
@@ -190,8 +117,8 @@ class SocketService {
                         user: {username},
                         reLoginCode: reLoginCode,
                     }));
-                    console.log('✅ Login/Relogin success, code:', reLoginCode);
-                    // Gọi lấy danh sách user NGAY SAU KHI LOGIN HOẶC RELOGIN THÀNH CÔNG
+                    console.log('Login/Relogin success, code:', reLoginCode);
+                    // Gọi lấy danh sách user
                     this.getUserList();
                     break;
 
@@ -203,14 +130,14 @@ class SocketService {
                         user: {username: registerUser},
                         reLoginCode: registerCode,
                     }));
-                    console.log('Register success');
+                    console.log('Đăng ký thành công');
                     this.getUserList();
                     break;
 
                 case 'GET_USER_LIST':
                     if (Array.isArray(responseData)) {
                         store.dispatch(setUserList(responseData));
-                        console.log('✅ Đã nhận danh sách user:', responseData.map((u: any) => u.name).join(', '));
+                        console.log('Đã nhận danh sách user:', responseData.map((u: any) => u.name).join(', '));
                     } else {
                         console.warn('GET_USER_LIST data không hợp lệ:', responseData);
                     }
@@ -238,11 +165,11 @@ class SocketService {
             }
         } else if (status === 'error') {
             const errorMessage = payload.mes || 'Có lỗi xảy ra';
-            console.error('Server error:', errorMessage);
+            console.error('Lỗi :', errorMessage);
 
             // Xử lý đặc biệt khi hết hạn đăng nhập
             if (errorMessage === 'User not Login') {
-                console.warn('⚠️ Server báo chưa đăng nhập. Đang tự động đăng nhập lại...');
+                console.warn('Chưa đăng nhập. Đang tự động đăng nhập lại...');
                 const user = localStorage.getItem('username');
                 const code = localStorage.getItem('reLoginCode');
                 if (user && code) {
@@ -261,10 +188,10 @@ class SocketService {
     }
 
     /**
-     * Start heartbeat to keep connection alive
+     * Bắt đầu giữ kết nối
      */
     private startHeartbeat() {
-        // Clear existing interval nếu có
+        // Xóa existing interval nếu có
         if (this.heartbeatInterval) {
             clearInterval(this.heartbeatInterval);
         }
@@ -272,21 +199,14 @@ class SocketService {
         // Gửi ping message mỗi 30s
         this.heartbeatInterval = setInterval(() => {
             if (this.socket && this.socket.readyState === WebSocket.OPEN) {
-                try {
                     this.send({
                         event: 'PING'
                     });
                     console.log('Heartbeat sent');
-                } catch (error) {
-                    console.error('Failed to send heartbeat:', error);
-                }
             }
         }, HEARTBEAT_INTERVAL);
     }
 
-    /**
-     * Stop heartbeat
-     */
     private stopHeartbeat() {
         if (this.heartbeatInterval) {
             clearInterval(this.heartbeatInterval);
@@ -294,23 +214,16 @@ class SocketService {
         }
     }
 
-    /**
-     * Attempt to reconnect and re-login if user was authenticated
-     */
     private async attemptReconnect() {
-        try {
-            await this.connect();
+        await this.connect();
 
-            // Auto re-login nếu có credentials
-            const username = localStorage.getItem('username');
-            const reLoginCode = localStorage.getItem('reLoginCode');
+        // Auto re-login nếu có credentials
+        const username = localStorage.getItem('username');
+        const reLoginCode = localStorage.getItem('reLoginCode');
 
-            if (username && reLoginCode) {
-                console.log('🔐 Auto re-login after reconnect...');
-                this.reLogin(username, reLoginCode);
-            }
-        } catch (error) {
-            console.error('Failed to reconnect:', error);
+        if (username && reLoginCode) {
+            console.log('Đang tự động đăng nhập lại...');
+            this.reLogin(username, reLoginCode);
         }
     }
 
@@ -333,10 +246,7 @@ class SocketService {
 
     // đăng ký
     async register(user: string, pass: string) {
-        // Đợi connection ready nếu đang kết nối
-        if (this.connectionReady) {
-            await this.connectionReady;
-        }
+        await this.connectionReady;
 
         // Lưu username vào localStorage để dùng khi nhận response
         localStorage.setItem('username', user);
@@ -352,10 +262,7 @@ class SocketService {
 
     // đăng nhập
     async login(user: string, pass: string) {
-        // Đợi connection ready nếu đang kết nối
-        if (this.connectionReady) {
-            await this.connectionReady;
-        }
+        await this.connectionReady;
 
         // Lưu username vào localStorage để dùng khi nhận response
         localStorage.setItem('username', user);
@@ -382,25 +289,11 @@ class SocketService {
 
     // Đăng xuất
     logout() {
-        // Disable auto-reconnect trước khi logout
         this.shouldReconnect = false;
 
-        // Chỉ gửi LOGOUT event nếu socket đã kết nối
-        if (this.socket && this.socket.readyState === WebSocket.OPEN) {
-            this.send({
-                event: 'LOGOUT'
-            });
-        } else {
-            // Nếu socket chưa kết nối, chỉ log warning, không throw error
-            console.warn('Socket not connected, skipping LOGOUT event');
-        }
-
-        // Re-enable reconnect sau khi logout (cho lần login tiếp theo)
-        // Nhưng user sẽ cần login lại manually
-        setTimeout(() => {
-            this.shouldReconnect = true;
-            this.reconnectAttempts = 0;
-        }, 1000);
+        this.send({
+            event: 'LOGOUT'
+        });
     }
 
     // chat với người
@@ -496,21 +389,11 @@ class SocketService {
     }
 
     /**
-     * Reconnect to WebSocket server
+     * Kết nối lại với socket server
      */
     reconnect(): Promise<void> {
-        if (this.retryCount >= MAX_RETRY_ATTEMPTS) {
-            const errorMsg = `Không thể kết nối sau ${MAX_RETRY_ATTEMPTS} lần thử. Vui lòng kiểm tra kết nối mạng và thử lại sau.`;
-            store.dispatch(socketConnectionError(errorMsg));
-            return Promise.reject(new Error(errorMsg));
-        }
-
-        this.retryCount++;
-
-        // Disconnect existing connection if any
         this.disconnect();
-
-        // Try to connect again
+        // Thử kết nối lại
         return this.connect();
     }
 }
