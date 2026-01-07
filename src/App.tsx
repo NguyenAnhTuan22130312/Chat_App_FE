@@ -7,10 +7,11 @@ import LoadingScreen from './components/common/LoadingScreen';
 import ConnectionErrorScreen from './components/common/ConnectionErrorScreen';
 import {useAppSelector, useAppDispatch} from "./hooks/reduxHooks";
 import {socketService} from "./services/socketService";
-import {loginRequest, logout} from "./store/slices/authSlice";
+import {loginRequest, logout,fetchUserAvatar} from "./store/slices/authSlice";
 import {store} from "./store/store";
 import Sidebar from './components/sidebar/Sidebar';
 import Profile from './screens/Profile';
+
 
 // Component for Home layout with Sidebar
 function HomeLayout() {
@@ -43,7 +44,7 @@ function HomeLayout() {
                     )}
                     </div>
                 <img 
-                        src={user?.avatar || "https://i.pravatar.cc/150?img=3"} 
+                        src={user?.avatar || "https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcT7imMwm5oKZ8t3qnhAptR3ZzpD-i2AuSiHoQ&s"} 
                         alt="My Avatar"
                         className="w-12 h-12 rounded-full object-cover border border-gray-300 ml-3" 
                     />
@@ -109,6 +110,7 @@ function App() {
     const isAuthenticated = useAppSelector((state) => state.auth.isAuthenticated);
     const socketConnected = useAppSelector((state) => state.auth.socketConnected);
     const socketConnectionError = useAppSelector((state) => state.auth.socketConnectionError);
+    const dispatch = useAppDispatch();
 
     useEffect(() => {
         const initializeConnection = async () => {
@@ -118,7 +120,10 @@ function App() {
             if (isAuthenticated) {
                 const reLoginCode = localStorage.getItem('reLoginCode');
                 const username = localStorage.getItem('username');
-
+                const savedUsername = localStorage.getItem('username');
+                if (savedUsername) {
+                    dispatch(fetchUserAvatar(savedUsername));
+                }
                 if (reLoginCode && username) {
                     // Tự động đăng nhập lại
                     store.dispatch(loginRequest());

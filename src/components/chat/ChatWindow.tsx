@@ -4,29 +4,29 @@ import MessageBubble from './MessageBubble';
 import ChatInput from './ChatInput';
 import { useAppSelector } from '../../hooks/reduxHooks'; 
 import { socketService } from '../../services/socketService';
-
+import { useUserAvatar } from '../../hooks/useUserAvatar';
 
 export default function ChatWindow() {
 
-  const { user,isAuthenticated } = useAppSelector((state) => state.auth);
+  const { user, isAuthenticated } = useAppSelector((state) => state.auth);
   const myUsername = user?.username;
   const { messages, currentPartner } = useAppSelector((state) => state.chat);
   const messagesEndRef = useRef<HTMLDivElement>(null);
+  
+  const partnerAvatar = useUserAvatar(currentPartner);
 
   useEffect(() => {
     const initChat = async () => {
       await socketService.connect();
 
       if (myUsername && currentPartner && isAuthenticated) {
-        console.log('Đợi 500ms để đảm bảo socket đã Re-Login...');
         setTimeout(() => {
-           console.log(`Bắt đầu lấy tin nhắn với ${currentPartner}`);
            socketService.getHistory(currentPartner);
         }, 500); 
-     }
-   };
-  initChat();
-  }, [currentPartner, myUsername,isAuthenticated]);
+      }
+    };
+    initChat();
+  }, [currentPartner, myUsername, isAuthenticated]);
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -49,17 +49,14 @@ export default function ChatWindow() {
               key={index} 
               text={msg.mes} 
               isMe={isMe}
-              avatar={!isMe ? "https://i.pravatar.cc/150?u=long" : undefined} 
+              avatar={!isMe ? partnerAvatar : undefined} 
             />
           );
         })}
 
       <div ref={messagesEndRef} />
      </div>
-
-
      <ChatInput />
    </div>
  );
 }
-

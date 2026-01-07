@@ -1,8 +1,8 @@
-// src/screens/Profile.tsx
 import React, { useState, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAppDispatch, useAppSelector } from '../hooks/reduxHooks';
 import { updateAvatar } from '../store/slices/authSlice';
+import { saveAvatarToFirebase } from '../services/firebaseConfig';
 
 export default function Profile() {
   const navigate = useNavigate();
@@ -17,6 +17,7 @@ export default function Profile() {
 
   const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
+    
     if (!file) return;
 
     setIsUploading(true);
@@ -33,6 +34,11 @@ export default function Profile() {
       const data = await response.json();
       if (data.secure_url) {
         dispatch(updateAvatar(data.secure_url));
+        
+        if (user?.username) {
+            saveAvatarToFirebase(user.username, data.secure_url);
+        }
+
         alert("Đổi avatar thành công!");
       }
     } catch (error) {
@@ -46,7 +52,6 @@ export default function Profile() {
   return (
     <div className="min-h-screen bg-gray-100 flex items-center justify-center p-4">
       <div className="bg-white rounded-xl shadow-lg w-full max-w-md overflow-hidden">
-        {/* Header */}
         <div className="bg-[#0084ff] p-4 flex items-center text-white">
           <button onClick={() => navigate('/')} className="mr-3 hover:bg-white/20 p-1 rounded-full">
              <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -56,10 +61,8 @@ export default function Profile() {
           <h1 className="text-xl font-bold">Quản lý tài khoản</h1>
         </div>
 
-        {/* Content */}
         <div className="p-6 flex flex-col items-center">
           
-          {/* Avatar Section */}
           <div className="relative group mb-6">
             <div className="w-32 h-32 rounded-full overflow-hidden border-4 border-gray-200">
                <img 
@@ -69,7 +72,6 @@ export default function Profile() {
                />
             </div>
             
-            {/* Overlay nút đổi ảnh */}
             <div 
                 onClick={() => fileInputRef.current?.click()}
                 className="absolute inset-0 bg-black/40 rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity cursor-pointer"
@@ -77,7 +79,6 @@ export default function Profile() {
                 <span className="text-white text-sm font-semibold">Đổi ảnh</span>
             </div>
             
-            {/* Loading spinner */}
             {isUploading && (
                 <div className="absolute inset-0 bg-white/80 rounded-full flex items-center justify-center">
                    <svg className="animate-spin h-8 w-8 text-[#0084ff]" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
@@ -96,7 +97,6 @@ export default function Profile() {
             />
           </div>
 
-          {/* User Info Form */}
           <div className="w-full space-y-4">
             <div>
                <label className="block text-gray-500 text-sm font-bold mb-1">Tên hiển thị</label>
