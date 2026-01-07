@@ -35,20 +35,32 @@ function HomeLayout() {
             {/* Sidebar */}
             <div className="w-[360px] h-full bg-gray-100 border-r border-gray-300 hidden md:flex flex-col">
                 {/* Sidebar Header */}
-                <div className="p-4 border-b border-gray-300">
+                <div className="p-4 border-b border-gray-300 flex items-center justify-between">
+                    <div>
                     <h2 className="text-lg font-bold text-gray-800">Chat App</h2>
                     {username && (
                         <p className="text-sm text-gray-600 mt-1">Xin chào, {username}</p>
                     )}
-                </div>
+                    </div>
                 <img 
                         src={user?.avatar || "https://i.pravatar.cc/150?img=3"} 
                         alt="My Avatar"
-                        className="w-10 h-10 rounded-full object-cover border border-gray-300" 
+                        className="w-12 h-12 rounded-full object-cover border border-gray-300 ml-3" 
                     />
+                </div>
+                
                 {/* Sidebar Content - Chat list area */}
                 <div className="flex-1 overflow-y-auto p-4">
 
+                
+
+                    <span className="text-gray-400 text-sm">
+                        Sidebar Area <br/> (Danh sách chat - Trung Han)
+                    </span>
+                </div>
+
+                {/* Logout Button at bottom */}
+                <div className="p-4 border-t border-gray-300">
                 <div 
                         onClick={() => navigate('/profile')}
                         className="mb-4 flex items-center p-3 bg-white rounded-xl shadow-sm cursor-pointer hover:bg-blue-50 transition-colors border border-transparent hover:border-blue-200"
@@ -64,13 +76,6 @@ function HomeLayout() {
                         </div>
                     </div>
 
-                    <span className="text-gray-400 text-sm">
-                        Sidebar Area <br/> (Danh sách chat - Trung Han)
-                    </span>
-                </div>
-
-                {/* Logout Button at bottom */}
-                <div className="p-4 border-t border-gray-300">
                     <button
                         onClick={handleLogout}
                         className="w-full py-2 px-4 bg-red-500 hover:bg-red-600 text-white font-semibold rounded-lg transition-colors duration-200 flex items-center justify-center gap-2"
