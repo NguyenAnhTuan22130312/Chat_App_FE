@@ -4,6 +4,7 @@ import { useAppDispatch, useAppSelector } from '../../hooks/reduxHooks';
 import { addMessage } from '../../store/slices/chatSlice';
 import EmojiShortcodePicker from './EmojiShortcodePicker';
 import MarkdownToolbar from './MarkdownToolbar';
+import RichTextInput from './RichTextInput';
 
 export default function ChatInput() {
   const [text, setText] = useState('');
@@ -11,7 +12,7 @@ export default function ChatInput() {
   const [showEmojiPicker, setShowEmojiPicker] = useState(false);
   const [showToolbar, setShowToolbar] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
-  const inputRef = useRef<HTMLInputElement>(null);
+  const inputRef = useRef<HTMLDivElement>(null);
   
   const { currentPartner } = useAppSelector(state => state.chat);
   const { user } = useAppSelector((state: { auth: { user: any } }) => state.auth);
@@ -84,7 +85,7 @@ export default function ChatInput() {
     }
   };
 
-  const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+  const handleKeyDown = (e: React.KeyboardEvent) => {
     if (e.key === 'Enter') {
       handleSendText();
       e.preventDefault();
@@ -94,7 +95,7 @@ export default function ChatInput() {
   return (
     <div className="relative">
       {/* Markdown Toolbar */}
-      {showToolbar && <MarkdownToolbar textareaRef={inputRef as React.RefObject<HTMLInputElement>} />}
+      {showToolbar && <MarkdownToolbar editorRef={inputRef} />}
       
       <div className="h-[60px] border-t border-gray-300 flex items-center px-4 bg-white">
 
@@ -137,16 +138,15 @@ export default function ChatInput() {
           </div>
         </div>
 
-        <div className="flex-1 relative">
-          <input
-            ref={inputRef}
-            type="text" 
+        <div className="flex-1 relative flex items-center">
+          <RichTextInput
             value={text}
-            onChange={(e) => setText(e.target.value)}
+            onChange={setText}
             onKeyDown={handleKeyDown}
-            placeholder={isUploading ? "Đang gửi ảnh..." : "Nhập tin nhắn... (dùng **bold** *italic*)"} 
+            placeholder={isUploading ? "Đang gửi ảnh..." : "Nhập tin nhắn..."}
             disabled={isUploading}
             className="w-full bg-gray-100 rounded-full py-2 px-4 pr-10 text-sm focus:outline-none focus:ring-1 focus:ring-blue-500 disabled:bg-gray-200 disabled:text-gray-500"
+            editorRef={inputRef}
           />
           
           {/* Emoji button */}

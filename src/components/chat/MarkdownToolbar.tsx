@@ -2,43 +2,54 @@ import React, { useState } from 'react';
 import ColorPicker from './ColorPicker';
 
 interface Props {
-  textareaRef: React.RefObject<HTMLInputElement>;
+  editorRef: React.RefObject<HTMLDivElement | null>;
 }
 
-export default function MarkdownToolbar({ textareaRef }: Props) {
+export default function MarkdownToolbar({ editorRef }: Props) {
   const [showColorPicker, setShowColorPicker] = useState(false);
 
   const wrapSelection = (prefix: string, suffix: string = prefix) => {
-    const textarea = textareaRef.current;
-    if (!textarea) return;
-
-    const start = textarea.selectionStart ?? 0;
-    const end = textarea.selectionEnd ?? 0;
-    const selectedText = textarea.value.substring(start, end);
-    const beforeText = textarea.value.substring(0, start);
-    const afterText = textarea.value.substring(end);
-
-    if (selectedText) {
-      // Chuyển đổi text
-      textarea.value = beforeText + prefix + selectedText + suffix + afterText;
+    if (!editorRef.current) return;
     
-      textarea.selectionStart = start + prefix.length;
-      textarea.selectionEnd = end + prefix.length;
-    } else {
-      const placeholder = 'text';
-      textarea.value = beforeText + prefix + placeholder + suffix + afterText;
+    const selection = window.getSelection();
+    if (!selection || selection.rangeCount === 0) return;
 
-      textarea.selectionStart = start + prefix.length;
-      textarea.selectionEnd = start + prefix.length + placeholder.length;
+    const range = selection.getRangeAt(0);
+    const selectedText = range.toString();
+
+    if (!selectedText) {
+      const placeholder = 'text';
+      const textNode = document.createTextNode(prefix + placeholder + suffix);
+      range.insertNode(textNode);
+      
+      const newRange = document.createRange();
+      newRange.setStart(textNode, prefix.length);
+      newRange.setEnd(textNode, prefix.length + placeholder.length);
+      selection.removeAllRanges();
+      selection.addRange(newRange);
+    } else {
+      const wrappedText = prefix + selectedText + suffix;
+      const textNode = document.createTextNode(wrappedText);
+      
+      range.deleteContents();
+      range.insertNode(textNode);
+      
+      const newRange = document.createRange();
+      newRange.setStartAfter(textNode);
+      newRange.collapse(true);
+      selection.removeAllRanges();
+      selection.addRange(newRange);
     }
 
-    textarea.focus();
     const event = new Event('input', { bubbles: true });
-    textarea.dispatchEvent(event);
+    editorRef.current.dispatchEvent(event);
+    
+    editorRef.current.focus();
   };
 
   const handleColorSelect = (colorHex: string) => {
     wrapSelection(`[${colorHex}]`, `[/${colorHex}]`);
+    setShowColorPicker(false);
   };
 
   const ToolButton = ({ 
@@ -53,6 +64,7 @@ export default function MarkdownToolbar({ textareaRef }: Props) {
     <button
       type="button"
       onClick={onClick}
+      onMouseDown={(e) => e.preventDefault()}
       title={title}
       className="px-3 py-1 text-sm font-semibold text-gray-700 hover:bg-gray-200 rounded transition-colors"
     >
