@@ -16,6 +16,19 @@ const SOCKET_URL = 'wss://chat.longapp.site/chat/chat';
 const HEARTBEAT_INTERVAL = 30000; // ping mỗi 30s để giữ kế nối server
 const RECONNECT_DELAY = 3000;
 const MAX_RECONNECT_ATTEMPTS = 5;
+// Trong file socketService.ts, thêm ở đầu class hoặc ngoài class
+const CHAT_WHITELIST = [
+    // Rooms
+    '22130302',
+    'ABC',
+    'trunghan',
+    // Users
+    'anhtuan12',
+    'hantr',
+    'long',
+    'hant123',
+    // Thêm sau nếu cần: 'trunghan', 'join4', ...
+];
 
 class SocketService {
     private socket: WebSocket | null = null;
@@ -139,27 +152,22 @@ class SocketService {
 
 
                 case 'GET_PEOPLE_CHAT_MES':
-                    const historyData = responseData;
-                    console.log("Server trả về lịch sử chat raw:", historyData);
+                    if (Array.isArray(responseData) && responseData.length > 0) {
+                        const lastMsg = responseData[0];
 
-                    if (Array.isArray(historyData)) {
-                        const sortedMessages = [...historyData].reverse();
-                        store.dispatch(setMessages(sortedMessages));
-                        console.log("Đã tải lịch sử chat:", sortedMessages.length, "tin nhắn");
+                        // FIX: partnerName là tên người còn lại, không phải "to"
+                        // Vì "to" là người nhận tin nhắn cuối, có thể là mình hoặc đối phương
+                        const currentUsername = localStorage.getItem('username') || '';
+                        const partnerName = lastMsg.name === currentUsername ? lastMsg.to : lastMsg.name;
 
-                        // === THÊM MỚI: Cập nhật last message cho Sidebar ===
-                        if (historyData.length > 0) {
-                            // Tin nhắn mới nhất là phần tử cuối cùng trong mảng gốc (trước khi reverse)
-                            const lastMsgRaw = historyData[historyData.length - 1];
-                            const partnerName = lastMsgRaw.to; // "to" là tên người chat cùng
+                        store.dispatch(setLastMessage({
+                            partnerName,
+                            message: lastMsg.mes,
+                            timestamp: lastMsg.createAt || new Date().toISOString(),
+                            senderName: lastMsg.name,
+                        }));
 
-                            store.dispatch(setLastMessage({
-                                partnerName,
-                                message: lastMsgRaw.mes,
-                                timestamp: lastMsgRaw.createAt || new Date().toISOString(),
-                                senderName: lastMsgRaw.name,
-                            }));
-                        }
+                        console.log(`Last message cho partner ${partnerName}: ${lastMsg.mes} (từ ${lastMsg.name})`);
                     }
                     break;
 
@@ -172,7 +180,7 @@ class SocketService {
                         // === THÊM: Cập nhật last message cho phòng ===
                         const chatData = responseData.chatData;
                         if (chatData.length > 0) {
-                            const lastMsgRaw = chatData[chatData.length - 1];
+                            const lastMsgRaw = chatData[0];
                             const partnerName = responseData.name; // tên phòng
 
                             store.dispatch(setLastMessage({
@@ -219,6 +227,7 @@ class SocketService {
                             actionTime: item.actionTime,
                         }));
 
+                        // Sort mới nhất lên đầu
                         partners.sort((a, b) => {
                             if (!a.actionTime || !b.actionTime) return 0;
                             return new Date(b.actionTime).getTime() - new Date(a.actionTime).getTime();
@@ -226,13 +235,22 @@ class SocketService {
 
                         store.dispatch(setPartners(partners));
 
-                        // === MỚI THÊM: Load last message cho từng partner ===
-                        partners.forEach(partner => {
-                            if (partner.type === 'people') {
-                                socketService.getHistory(partner.name); // hàm đã có sẵn trong socketService
-                            } else if (partner.type === 'room') {
-                                socketService.getRoomHistory(partner.name, 1);
-                            }
+                        // === CHỈ LOAD LAST MESSAGE CHO CÁC PARTNER TRONG WHITELIST ===
+                        const partnersToLoad = partners.filter(p =>
+                            CHAT_WHITELIST.includes(p.name)
+                        );
+
+                        console.log(`Đang load last message cho ${partnersToLoad.length} partner quan trọng:`, partnersToLoad.map(p => p.name));
+
+                        partnersToLoad.forEach((partner, index) => {
+                            // Thêm delay nhỏ để tránh burst request (rất an toàn)
+                            setTimeout(() => {
+                                if (partner.type === 'people') {
+                                    socketService.getHistory(partner.name);
+                                } else if (partner.type === 'room') {
+                                    socketService.getRoomHistory(partner.name, 1);
+                                }
+                            }, index * 300); // 300ms giữa mỗi request
                         });
                     }
                     break;

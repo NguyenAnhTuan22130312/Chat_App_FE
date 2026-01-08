@@ -22,13 +22,32 @@ export default function ChatWindow() {
       if (myUsername && currentPartner && isAuthenticated) {
         setTimeout(() => {
            socketService.getHistory(currentPartner);
-        }, 500); 
+        }, 500);
       }
     };
     initChat();
   }, [currentPartner, myUsername, isAuthenticated]);
 
-  useEffect(() => {
+    // useEffect(() => {
+    //     if (!myUsername || !currentPartner || !isAuthenticated) return;
+    //
+    //     socketService
+    //         .connect()
+    //         .then(() => {
+    //             socketService.getHistory(currentPartner);
+    //         })
+    //         .catch((err) => {
+    //             console.error('Không thể kết nối socket:', err);
+    //         });
+    //
+    //     return () => {
+    //         socketService.disconnect();
+    //     };
+    // }, [currentPartner, myUsername, isAuthenticated]);
+
+
+
+    useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages]);
 

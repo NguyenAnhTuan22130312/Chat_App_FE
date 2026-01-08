@@ -46,9 +46,25 @@ const ChatListItem = ({ partner, isActive, onClick }: any) => {
     const currentUsername = useAppSelector((state) => state.auth.user?.username);
 
     let previewText = partner.type === 'people' ? 'Nhắn tin cá nhân' : 'Phòng cộng đồng';
+
     if (lastMsg) {
-        const isMe = lastMsg.senderName === currentUsername;
-        previewText = (isMe ? 'Bạn: ' : '') + lastMsg.message;
+        // Kiểm tra xem tin nhắn có phải là ảnh không
+        const msg = lastMsg.message;
+        const isImage = /\.(jpeg|jpg|gif|png|webp|bmp|svg)$/i.test(msg) ||
+            msg.includes('cloudinary.com') ||
+            msg.startsWith('blob:');
+
+        if (isImage) {
+            previewText = '📷 Đã gửi một ảnh';
+        } else {
+            const isMe = lastMsg.senderName === currentUsername;
+            previewText = (isMe ? 'Bạn: ' : (lastMsg.senderName ? `${lastMsg.senderName}: ` : '')) + msg;
+
+            // Cắt ngắn nếu quá dài (tránh tràn layout)
+            if (previewText.length > 40) {
+                previewText = previewText.substring(0, 37) + '...';
+            }
+        }
     }
 
     return (
