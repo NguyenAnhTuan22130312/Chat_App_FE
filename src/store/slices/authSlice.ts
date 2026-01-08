@@ -1,7 +1,9 @@
-import {createSlice, PayloadAction} from "@reduxjs/toolkit";
+import {createSlice, PayloadAction, createAsyncThunk} from "@reduxjs/toolkit";
+import { getAvatarFromFirebase } from "../../services/firebaseConfig";
 
 interface User {
     username: string;
+    avatar?: string;
 }
 
 interface AuthState {
@@ -15,10 +17,20 @@ interface AuthState {
     socketConnectionError: string | null;
 }
 
-// State ban đầu khi project khởi động
+export const fetchUserAvatar = createAsyncThunk(
+    'auth/fetchAvatar',
+    async (username: string) => {
+        const url = await getAvatarFromFirebase(username);
+        return url;
+    }
+);
+
 const initialState: AuthState = {
-    user: localStorage.getItem('username') ? {username: localStorage.getItem('username')!} : null,
-    isAuthenticated: !!localStorage.getItem('reLoginCode'), // True nếu có reLoginCode
+    user: localStorage.getItem('username') ? {
+        username: localStorage.getItem('username')!,
+        avatar: localStorage.getItem('user_avatar') || undefined
+    } : null,
+    isAuthenticated: !!localStorage.getItem('reLoginCode'), 
     reLoginCode: localStorage.getItem('reLoginCode'),
     loading: false,
     error: null,
@@ -31,29 +43,36 @@ const authSlice = createSlice({
     name: 'auth',
     initialState,
     reducers: {
-        // Bắt đầu yêu cầu đăng nhập/đăng ký
         loginRequest: (state) => {
             state.loading = true;
             state.error = null;
         },
 
-        // Đăng nhập thành công, nhận thông tin user và re_login_code từ server
         loginSuccess: (state, action: PayloadAction<{ user: User; reLoginCode?: string }>) => {
             state.loading = false;
             state.isAuthenticated = true;
-            state.user = action.payload.user;
+            
+            const currentAvatar = state.user?.avatar || localStorage.getItem('user_avatar');
+            state.user = {
+                ...action.payload.user,
+                avatar: currentAvatar || undefined
+            };
 
-            // If server trả về re_login_code thì lưu vào state và localStorage
             if (action.payload.reLoginCode) {
                 state.reLoginCode = action.payload.reLoginCode;
                 localStorage.setItem('reLoginCode', action.payload.reLoginCode);
-                // Lưu username để dùng cho RE_LOGIN
                 localStorage.setItem('username', action.payload.user.username);
             }
             state.error = null;
         },
 
-        // Đăng nhập failure
+        updateAvatar: (state, action: PayloadAction<string>) => {
+            if (state.user) {
+              state.user.avatar = action.payload;
+              localStorage.setItem('user_avatar', action.payload);
+            }
+        },
+
         loginFailure: (state, action: PayloadAction<string>) => {
             state.loading = false;
             state.isAuthenticated = false;
@@ -67,7 +86,6 @@ const authSlice = createSlice({
             state.registerSuccess = true;
         },
 
-        // Đăng xuất
         logout: (state) => {
             state.user = null;
             state.isAuthenticated = false;
@@ -75,13 +93,13 @@ const authSlice = createSlice({
             state.error = null;
             localStorage.removeItem('reLoginCode');
             localStorage.removeItem('username');
+            localStorage.removeItem('user_avatar');
         },
 
         clearError: (state) => {
             state.error = null;
         },
 
-        // WebSocket connection actions
         socketConnected: (state) => {
             state.socketConnected = true;
             state.socketConnectionError = null;
@@ -96,6 +114,14 @@ const authSlice = createSlice({
             state.socketConnectionError = action.payload;
         },
     },
+    extraReducers: (builder) => {
+        builder.addCase(fetchUserAvatar.fulfilled, (state, action) => {
+            if (state.user && action.payload) {
+                state.user.avatar = action.payload;
+                localStorage.setItem('user_avatar', action.payload);
+            }
+        });
+    }
 });
 
 export const {
@@ -108,7 +134,7 @@ export const {
     socketConnected,
     socketDisconnected,
     socketConnectionError,
+    updateAvatar,
 } = authSlice.actions;
 
-// Export reducer để add vào store
 export default authSlice.reducer;
