@@ -1,25 +1,32 @@
+// src/store/slices/currentChatSlice.ts
 import { createSlice, PayloadAction } from '@reduxjs/toolkit';
 
+export type PartnerType = 'people' | 'room';
+
 interface CurrentChatState {
-    type: 'room' | 'people' | null;
     name: string | null;
+    type: PartnerType | null;
 }
 
 const initialState: CurrentChatState = {
-    type: null,
     name: null,
+    type: null,
 };
 
 const currentChatSlice = createSlice({
     name: 'currentChat',
     initialState,
     reducers: {
-        setCurrentChat: (state, action: PayloadAction<{ type: 'room' | 'people'; name: string }>) => {
-            state.type = action.payload.type;
+        setCurrentChat: (state, action: PayloadAction<{ name: string; type: PartnerType }>) => {
             state.name = action.payload.name;
+            state.type = action.payload.type;
+        },
+        clearCurrentChat: (state) => {
+            state.name = null;
+            state.type = null;
         },
     },
 });
 
-export const { setCurrentChat } = currentChatSlice.actions;
+export const { setCurrentChat, clearCurrentChat } = currentChatSlice.actions;
 export default currentChatSlice.reducer;

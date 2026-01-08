@@ -1,13 +1,17 @@
 import {configureStore} from "@reduxjs/toolkit";
 import authReducer from './slices/authSlice';
-
+import chatPartnerReducer from './slices/chatPartnerSlice';
 import chatReducer from './slices/chatSlice';
-import userListReducer from './slices/userListSlice';
+import currentChatReducer from './slices/currentChatSlice'
+import lastMessageReducer from './slices/lastMessageSlice';
+
 export const store = configureStore({
     reducer: {
         auth: authReducer,
         chat: chatReducer,
-         userList: userListReducer,
+        chatPartner: chatPartnerReducer,
+        currentChat: currentChatReducer,
+        lastMessage: lastMessageReducer,
     },
 });
 

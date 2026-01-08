@@ -8,7 +8,9 @@ import {
 } from "../store/slices/authSlice";
 import {addMessage, setMessages} from "../store/slices/chatSlice";
 import {store} from "../store/store";
-import {setUserList} from "../store/slices/userListSlice";
+import {ChatPartner, setPartners} from "../store/slices/chatPartnerSlice";
+import { setLastMessage } from "../store/slices/lastMessageSlice";
+
 
 const SOCKET_URL = 'wss://chat.longapp.site/chat/chat';
 const HEARTBEAT_INTERVAL = 30000; // ping mỗi 30s để giữ kế nối server
@@ -134,34 +136,126 @@ class SocketService {
                     this.getUserList();
                     break;
 
-                case 'GET_USER_LIST':
-                    if (Array.isArray(responseData)) {
-                        store.dispatch(setUserList(responseData));
-                        console.log('Đã nhận danh sách user:', responseData.map((u: any) => u.name).join(', '));
-                    } else {
-                        console.warn('GET_USER_LIST data không hợp lệ:', responseData);
-                    }
-                    break;
+
 
                 case 'GET_PEOPLE_CHAT_MES':
                     const historyData = responseData;
                     console.log("Server trả về lịch sử chat raw:", historyData);
+
                     if (Array.isArray(historyData)) {
                         const sortedMessages = [...historyData].reverse();
                         store.dispatch(setMessages(sortedMessages));
                         console.log("Đã tải lịch sử chat:", sortedMessages.length, "tin nhắn");
+
+                        // === THÊM MỚI: Cập nhật last message cho Sidebar ===
+                        if (historyData.length > 0) {
+                            // Tin nhắn mới nhất là phần tử cuối cùng trong mảng gốc (trước khi reverse)
+                            const lastMsgRaw = historyData[historyData.length - 1];
+                            const partnerName = lastMsgRaw.to; // "to" là tên người chat cùng
+
+                            store.dispatch(setLastMessage({
+                                partnerName,
+                                message: lastMsgRaw.mes,
+                                timestamp: lastMsgRaw.createAt || new Date().toISOString(),
+                                senderName: lastMsgRaw.name,
+                            }));
+                        }
+                    }
+                    break;
+
+
+                case 'GET_ROOM_CHAT_MES':
+                    if (responseData && responseData.chatData && Array.isArray(responseData.chatData)) {
+                        // Giả sử code cũ của nhóm bạn có dispatch lịch sử vào chatSlice ở đây
+                        // (nếu có thì giữ nguyên)
+
+                        // === THÊM: Cập nhật last message cho phòng ===
+                        const chatData = responseData.chatData;
+                        if (chatData.length > 0) {
+                            const lastMsgRaw = chatData[chatData.length - 1];
+                            const partnerName = responseData.name; // tên phòng
+
+                            store.dispatch(setLastMessage({
+                                partnerName,
+                                message: lastMsgRaw.mes,
+                                timestamp: lastMsgRaw.createAt || new Date().toISOString(),
+                                senderName: lastMsgRaw.name,
+                            }));
+                        }
                     }
                     break;
 
                 case 'SEND_CHAT':
                     if (responseData) {
+                        // Giữ nguyên: thêm tin nhắn vào lịch sử chat hiện tại (cho ChatWindow bên phải)
                         store.dispatch(addMessage(responseData));
+
+                        // Mới thêm: cập nhật last message cho Sidebar
+                        const { to, mes, name: senderName, createAt } = responseData;
+
+                        if (to && mes) {
+                            const partnerName = to; // "to" chính là tên room hoặc tên người nhận
+                            const timestamp = createAt || new Date().toISOString();
+
+                            store.dispatch(setLastMessage({
+                                partnerName,
+                                message: mes,
+                                timestamp,
+                                senderName: senderName || 'Unknown',
+                            }));
+
+                            // Optional: refresh list để sort lại theo hoạt động mới nhất
+                            // (an toàn vì actionTime sẽ update)
+                            socketService.getUserList();
+                        }
+                    }
+                    break;
+
+                case 'GET_USER_LIST':
+                    if (Array.isArray(responseData)) {
+                        const partners: ChatPartner[] = responseData.map((item: any) => ({
+                            name: item.name,
+                            type: item.type === 1 ? 'room' : 'people',
+                            actionTime: item.actionTime,
+                        }));
+
+                        partners.sort((a, b) => {
+                            if (!a.actionTime || !b.actionTime) return 0;
+                            return new Date(b.actionTime).getTime() - new Date(a.actionTime).getTime();
+                        });
+
+                        store.dispatch(setPartners(partners));
+
+                        // === MỚI THÊM: Load last message cho từng partner ===
+                        partners.forEach(partner => {
+                            if (partner.type === 'people') {
+                                socketService.getHistory(partner.name); // hàm đã có sẵn trong socketService
+                            } else if (partner.type === 'room') {
+                                socketService.getRoomHistory(partner.name, 1);
+                            }
+                        });
+                    }
+                    break;
+                case 'CREATE_ROOM':
+                case 'JOIN_ROOM':
+                    console.log(`${event} thành công:`, responseData?.name || 'unknown');
+                    // Server sẽ tự thêm room vào GET_USER_LIST → gọi lại để refresh
+                    this.getUserList();
+                    break;
+
+                case 'CHECK_USER_ONLINE':
+                    if (responseData && typeof responseData.status === 'boolean') {
+                        // Lưu ý: hiện tại response không có username → cần cải thiện sau
+                        // Tạm thời log thôi
+                        console.log('Online status received:', responseData.status);
+                        // Khi build sidebar, ta sẽ xử lý chi tiết hơn (ví dụ gọi khi hover)
                     }
                     break;
 
                 default:
                     console.log('Event khác:', event);
                     break;
+
             }
         } else if (status === 'error') {
             const errorMessage = payload.mes || 'Có lỗi xảy ra';
@@ -329,21 +423,6 @@ class SocketService {
         }
     }
 
-    // Tạo phòng chat mới
-    createRoom(roomName: string) {
-        this.send({
-            event: 'CREATE_ROOM',
-            data: {name: roomName}
-        });
-    }
-
-    // Tham gia phòng chat
-    joinRoom(roomName: string) {
-        this.send({
-            event: 'JOIN_ROOM',
-            data: {name: roomName}
-        });
-    }
 
     // Lấy lịch sử tin nhắn phòng (page bắt đầu từ 1)
     getRoomHistory(roomName: string, page: number = 1) {
@@ -372,22 +451,6 @@ class SocketService {
         });
     }
 
-    // Kiểm tra user có tồn tại không
-    checkUserExist(username: string) {
-        this.send({
-            event: 'CHECK_USER_EXIST',
-            data: {user: username}
-        });
-    }
-
-    // Kiểm tra user có online không
-    checkUserOnline(username: string) {
-        this.send({
-            event: 'CHECK_USER_ONLINE',
-            data: {user: username}
-        });
-    }
-
     /**
      * Kết nối lại với socket server
      */
@@ -396,6 +459,40 @@ class SocketService {
         // Thử kết nối lại
         return this.connect();
     }
+
+    // Tạo phòng chat mới
+    createRoom(roomName: string) {
+        this.send({
+            event: 'CREATE_ROOM',
+            data: { name: roomName }
+        });
+    }
+
+// Tham gia phòng chat
+    joinRoom(roomName: string) {
+        this.send({
+            event: 'JOIN_ROOM',
+            data: { name: roomName }
+        });
+    }
+
+// Kiểm tra user có tồn tại không
+    checkUserExist(username: string) {
+        this.send({
+            event: 'CHECK_USER_EXIST',
+            data: { user: username }
+        });
+    }
+
+// Kiểm tra user có online không
+    checkUserOnline(username: string) {
+        this.send({
+            event: 'CHECK_USER_ONLINE',
+            data: { user: username }
+        });
+    }
+
+
 }
 
 export const socketService = new SocketService();
