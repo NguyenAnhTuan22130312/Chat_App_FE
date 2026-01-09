@@ -6,6 +6,9 @@ import EmojiShortcodePicker from './EmojiShortcodePicker';
 import MarkdownToolbar from './MarkdownToolbar';
 import RichTextInput from './RichTextInput';
 
+const CLOUD_NAME = "dox9vbxjn";
+const UPLOAD_PRESET = "chat_app_preset";
+
 export default function ChatInput() {
   const [text, setText] = useState('');
   const [isUploading, setIsUploading] = useState(false); 
@@ -16,10 +19,7 @@ export default function ChatInput() {
   
   const { name: currentName, type: currentType } = useAppSelector(state => state.currentChat);
   const { user } = useAppSelector((state) => state.auth);
-  const dispatch = useAppDispatch();
-
-  const CLOUD_NAME = "dox9vbxjn"; 
-  const UPLOAD_PRESET = "chat_app_preset"; 
+  const dispatch = useAppDispatch(); 
 
   const sendMessage = async (content: string) => {
     if (!currentName || !currentType) return;
@@ -32,15 +32,13 @@ export default function ChatInput() {
     };
     dispatch(addMessage(tempMessage));
 
-    // 2. Gửi qua Socket
     try {
       await socketService.connect();
       
-      // SỬA: Kiểm tra loại chat để gọi hàm socket tương ứng
       if (currentType === 'room') {
-          socketService.sendMessageToRoom(currentName, content);
+        socketService.sendMessageToRoom(currentName, content);
       } else {
-          socketService.sendMessageToPeople(currentName, content);
+        socketService.sendMessageToPeople(currentName, content);
       }
       
     } catch (error) {
@@ -57,11 +55,7 @@ export default function ChatInput() {
   const handleEmojiSelect = (shortcode: string) => {
     setText(prev => prev + shortcode + ' ');
     setShowEmojiPicker(false);
-    // Focus lại vào input sau khi chọn emoji
-    if (inputRef.current) {
-        // Logic focus tùy thuộc vào RichTextInput implementation, 
-        // nhưng cơ bản là giữ focus
-    }
+    inputRef.current?.focus();
   };
 
   const handleImageSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -107,6 +101,12 @@ export default function ChatInput() {
     }
   };
 
+  // Gửi thumbs up
+  const handleQuickThumbsUp = () => {
+    if (isDisabled) return;
+    sendMessage(':thumbsup:');
+  };
+
   // Nếu chưa chọn chat thì disable input
   const isDisabled = !currentName || isUploading;
 
@@ -115,7 +115,7 @@ export default function ChatInput() {
       {/* Markdown Toolbar */}
       {showToolbar && <MarkdownToolbar editorRef={inputRef} />}
       
-      <div className="h-[60px] border-t border-gray-300 flex items-center px-4 bg-white">
+      <div className="h-[60px] border-t border-gray-300 dark:border-gray-700 flex items-center px-4 bg-white dark:bg-gray-800">
 
         <input 
           type="file" 
@@ -125,10 +125,10 @@ export default function ChatInput() {
           className="hidden" 
         />
 
-        <div className="flex space-x-3 text-gray-500 mr-3">
+        <div className="flex space-x-3 text-gray-500 dark:text-gray-400 mr-3">
           {/* Format button */}
           <div
-            className={`cursor-pointer hover:text-blue-500 ${isDisabled ? 'opacity-50 pointer-events-none' : ''}`}
+            className={`cursor-pointer hover:text-blue-500 dark:hover:text-blue-400 transition-colors ${isDisabled ? 'opacity-50 pointer-events-none' : ''}`}
             onClick={() => setShowToolbar(!showToolbar)}
             title="Format text"
           >
@@ -139,12 +139,12 @@ export default function ChatInput() {
 
           {/* Image upload */}
           <div 
-            className={`cursor-pointer hover:text-blue-500 ${isDisabled ? 'opacity-50 pointer-events-none' : ''}`} 
+            className={`cursor-pointer hover:text-blue-500 dark:hover:text-blue-400 transition-colors ${isDisabled ? 'opacity-50 pointer-events-none' : ''}`} 
             onClick={() => fileInputRef.current?.click()}
             title="Gửi ảnh"
           >
             {isUploading ? (
-              <svg className="animate-spin h-6 w-6 text-blue-500" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+              <svg className="animate-spin h-6 w-6 text-blue-500 dark:text-blue-400" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
                 <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
                 <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
               </svg>
@@ -163,27 +163,47 @@ export default function ChatInput() {
             onKeyDown={handleKeyDown}
             placeholder={isUploading ? "Đang gửi ảnh..." : (currentName ? "Nhập tin nhắn..." : "Chọn hội thoại để chat")}
             disabled={isDisabled}
-            className="w-full bg-gray-100 rounded-full py-2 px-4 pr-10 text-sm focus:outline-none focus:ring-1 focus:ring-blue-500 disabled:bg-gray-200 disabled:text-gray-500"
+            className="w-full bg-gray-100 dark:bg-gray-700 rounded-full py-2 px-4 pr-10 text-sm text-gray-900 dark:text-gray-100
+            placeholder:text-gray-500 dark:placeholder:text-gray-400 focus:outline-none focus:ring-1 focus:ring-blue-500 dark:focus:ring-blue-400
+            disabled:bg-gray-200 dark:disabled:bg-gray-800 disabled:text-gray-500 dark:disabled:text-gray-600"
             editorRef={inputRef}
           />
-          
-          {/* Emoji button */}
+
+          {/* Emoji Picker button */}
           <button
             onClick={() => setShowEmojiPicker(!showEmojiPicker)}
             disabled={isDisabled}
-            className={`absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-yellow-500 text-xl transition-colors ${isDisabled ? 'opacity-50' : ''}`}
+            className={`absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 dark:text-gray-500 hover:text-yellow-500 dark:hover:text-yellow-400 text-xl transition-colors ${isDisabled ? 'opacity-50' : ''}`}
             type="button"
+            title="Chọn emoji"
           >
-            👍
+            😊
           </button>
         </div>
 
-        <div 
-            className={`ml-3 text-[#0084ff] cursor-pointer ${isDisabled ? 'opacity-50 pointer-events-none' : ''}`} 
-            onClick={handleSendText}
-        >
-          <svg className="w-7 h-7" fill="currentColor" viewBox="0 0 20 20"><path d="M2 10.5a1.5 1.5 0 113 0v6a1.5 1.5 0 01-3 0v-6zM6 10.333v5.43a2 2 0 001.106 1.79l.05.025A4 4 0 008.943 18h5.416a2 2 0 001.962-1.608l1.2-6A2 2 0 0015.56 8H12V4a2 2 0 00-2-2 1 1 0 00-1 1v7.333l-2 2z" /></svg>
-        </div>
+        {text.trim() ? (
+          <button
+              className={`ml-3 text-[#0084ff] dark:text-blue-400 cursor-pointer transition-all hover:scale-110 ${isDisabled ? 'opacity-50 pointer-events-none' : ''}`}
+              onClick={handleSendText}
+              disabled={isDisabled}
+              type="button"
+              title="Gửi tin nhắn"
+          >
+            <svg className="w-7 h-7" fill="currentColor" viewBox="0 0 24 24">
+              <path d="M2.01 21L23 12 2.01 3 2 10l15 2-15 2z"/>
+            </svg>
+          </button>
+        ) : (
+          <button
+              className={`ml-3 text-2xl hover:scale-125 transition-transform ${isDisabled ? 'opacity-50 pointer-events-none grayscale' : ''}`}
+              onClick={handleQuickThumbsUp}
+              disabled={isDisabled}
+              type="button"
+              title="Gửi thumbs up"
+          >
+            👍
+          </button>
+        )}
       </div>
 
       {/* Emoji Picker Popup */}

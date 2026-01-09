@@ -40,18 +40,18 @@ export default function ChatWindow() {
 
   if (!currentChatName) {
       return (
-          <div className="flex flex-col h-screen bg-white w-full border-l border-gray-300 items-center justify-center text-gray-400">
+          <div className="flex flex-col h-screen bg-white dark:bg-gray-900 w-full border-l border-gray-300 dark:border-gray-700 items-center justify-center text-gray-400 dark:text-gray-500">
               Chọn một cuộc hội thoại để bắt đầu
           </div>
       );
   }
 
   return (
-    <div className="flex flex-col h-screen bg-white w-full border-l border-gray-300">
+    <div className="flex flex-col h-screen bg-white dark:bg-gray-900 w-full border-l border-gray-300 dark:border-gray-700">
       <ChatHeader />
       <div className="flex-1 overflow-y-auto p-4 flex flex-col space-y-1">
         {messages.length === 0 && (
-          <div className="text-center text-gray-400 mt-10">
+          <div className="text-center text-gray-400 dark:text-gray-500 mt-10">
             Bắt đầu cuộc trò chuyện với {currentChatName}...
           </div>
         )}

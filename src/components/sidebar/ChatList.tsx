@@ -2,7 +2,7 @@ import { useAppSelector, useAppDispatch } from '../../hooks/reduxHooks';
 import { setCurrentChat } from '../../store/slices/currentChatSlice';
 import { useUserAvatar } from '../../hooks/useUserAvatar';
 import { useMemo } from 'react';
-import setCurrentPartner from '../../store/slices/chatSlice';
+import { replaceEmojiShortcodes } from '../../utils/emojiShortcodes';
 
 interface ChatListProps {
     searchQuery: string;
@@ -67,6 +67,8 @@ const ChatListItem = ({ partner, isActive, onClick }: any) => {
             if (previewText.length > 40) {
                 previewText = previewText.substring(0, 37) + '...';
             }
+            
+            previewText = replaceEmojiShortcodes(previewText);
         }
     }
 

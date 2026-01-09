@@ -5,6 +5,26 @@ interface Props {
   editorRef: React.RefObject<HTMLDivElement | null>;
 }
 
+interface ToolButtonProps {
+  label: string | React.ReactNode;
+  onClick: () => void;
+  title: string;
+}
+
+const ToolButton = React.memo(({ label, onClick, title }: ToolButtonProps) => (
+  <button
+    type="button"
+    onClick={onClick}
+    onMouseDown={(e) => e.preventDefault()}
+    title={title}
+    className="px-3 py-1 text-sm font-semibold text-gray-700 dark:text-gray-200 hover:bg-gray-200 dark:hover:bg-gray-700 rounded transition-colors"
+  >
+    {label}
+  </button>
+));
+
+ToolButton.displayName = 'ToolButton';
+
 export default function MarkdownToolbar({ editorRef }: Props) {
   const [showColorPicker, setShowColorPicker] = useState(false);
 
@@ -52,30 +72,10 @@ export default function MarkdownToolbar({ editorRef }: Props) {
     setShowColorPicker(false);
   };
 
-  const ToolButton = ({ 
-    label, 
-    onClick, 
-    title 
-  }: { 
-    label: string | React.ReactNode; 
-    onClick: () => void; 
-    title: string;
-  }) => (
-    <button
-      type="button"
-      onClick={onClick}
-      onMouseDown={(e) => e.preventDefault()}
-      title={title}
-      className="px-3 py-1 text-sm font-semibold text-gray-700 hover:bg-gray-200 rounded transition-colors"
-    >
-      {label}
-    </button>
-  );
-
   return (
     <div className="relative">
-      <div className="flex items-center gap-1 p-2 bg-gray-50 border-b border-gray-200">
-        <span className="text-xs text-gray-500 mr-2">Format:</span>
+      <div className="flex items-center gap-1 p-2 bg-gray-50 dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700">
+        <span className="text-xs text-gray-500 dark:text-gray-400 mr-2">Format:</span>
         
         <ToolButton 
           label="B" 
@@ -95,7 +95,7 @@ export default function MarkdownToolbar({ editorRef }: Props) {
           title="Underline: __text__"
         />
 
-        <div className="mx-2 h-4 border-l border-gray-300"></div>
+        <div className="mx-2 h-4 border-l border-gray-300 dark:border-gray-600"></div>
 
         <ToolButton 
           label={<span style={{color: '#FF0000'}}>A</span>}
@@ -103,7 +103,7 @@ export default function MarkdownToolbar({ editorRef }: Props) {
           title="Text Color"
         />
 
-        <div className="ml-auto text-xs text-gray-400">
+        <div className="ml-auto text-xs text-gray-400 dark:text-gray-500">
           Chọn text và click chuyển đổi
         </div>
       </div>
