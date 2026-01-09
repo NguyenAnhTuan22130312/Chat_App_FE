@@ -1,4 +1,3 @@
-// src/store/slices/currentChatSlice.ts
 import { createSlice, PayloadAction } from '@reduxjs/toolkit';
 
 export type PartnerType = 'people' | 'room';
