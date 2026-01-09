@@ -2,7 +2,7 @@ import React, { useState, useRef } from 'react';
 import { socketService } from '../../services/socketService';
 import { useAppDispatch, useAppSelector } from '../../hooks/reduxHooks';
 import { addMessage } from '../../store/slices/chatSlice';
-import EmojiShortcodePicker from './EmojiShortcodePicker';
+import EmojiStickerPicker from './EmojiStickerPicker';
 import MarkdownToolbar from './MarkdownToolbar';
 import RichTextInput from './RichTextInput';
 
@@ -54,8 +54,12 @@ export default function ChatInput() {
 
   const handleEmojiSelect = (shortcode: string) => {
     setText(prev => prev + shortcode + ' ');
-    setShowEmojiPicker(false);
     inputRef.current?.focus();
+  };
+
+  const handleGifSelect = (gifUrl: string) => {
+    sendMessage(gifUrl);
+    setShowEmojiPicker(false);
   };
 
   const handleImageSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -169,15 +173,20 @@ export default function ChatInput() {
             editorRef={inputRef}
           />
 
-          {/* Emoji Picker button */}
+          {/* Emoji/Sticker Picker button */}
           <button
             onClick={() => setShowEmojiPicker(!showEmojiPicker)}
             disabled={isDisabled}
-            className={`absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 dark:text-gray-500 hover:text-yellow-500 dark:hover:text-yellow-400 text-xl transition-colors ${isDisabled ? 'opacity-50' : ''}`}
+            className={`absolute right-3 top-1/2 transform -translate-y-1/2 transition-colors ${isDisabled ? 'opacity-50' : ''}`}
             type="button"
-            title="Chọn emoji"
+            title="Chọn emoji/sticker"
           >
-            😊
+            <svg className="w-6 h-6 text-gray-500 dark:text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <circle cx="12" cy="12" r="10" strokeWidth="1.5"/>
+              <circle cx="9" cy="10" r="1" fill="currentColor"/>
+              <circle cx="15" cy="10" r="1" fill="currentColor"/>
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.5" d="M8 14s1.5 2 4 2 4-2 4-2"/>
+            </svg>
           </button>
         </div>
 
@@ -206,10 +215,11 @@ export default function ChatInput() {
         )}
       </div>
 
-      {/* Emoji Picker Popup */}
+      {/* Emoji/Sticker Picker Popup */}
       {showEmojiPicker && (
-        <EmojiShortcodePicker
-          onSelect={handleEmojiSelect}
+        <EmojiStickerPicker
+          onEmojiSelect={handleEmojiSelect}
+          onGifSelect={handleGifSelect}
           onClose={() => setShowEmojiPicker(false)}
         />
       )}
