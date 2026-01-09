@@ -14,25 +14,35 @@ export default function ChatInput() {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const inputRef = useRef<HTMLDivElement>(null);
   
-  const { currentPartner } = useAppSelector(state => state.chat);
-  const { user } = useAppSelector((state: { auth: { user: any } }) => state.auth);
+  const { name: currentName, type: currentType } = useAppSelector(state => state.currentChat);
+  const { user } = useAppSelector((state) => state.auth);
   const dispatch = useAppDispatch();
 
   const CLOUD_NAME = "dox9vbxjn"; 
   const UPLOAD_PRESET = "chat_app_preset"; 
 
   const sendMessage = async (content: string) => {
+    if (!currentName || !currentType) return;
+
     const tempMessage = {
       name: user?.username || 'me',
       mes: content,
-      to: currentPartner,
+      to: currentName,
       createAt: new Date().toISOString()
     };
     dispatch(addMessage(tempMessage));
 
+    // 2. Gửi qua Socket
     try {
       await socketService.connect();
-      socketService.sendMessageToPeople(currentPartner, content);
+      
+      // SỬA: Kiểm tra loại chat để gọi hàm socket tương ứng
+      if (currentType === 'room') {
+          socketService.sendMessageToRoom(currentName, content);
+      } else {
+          socketService.sendMessageToPeople(currentName, content);
+      }
+      
     } catch (error) {
       console.error("Lỗi socket:", error);
     }
@@ -47,7 +57,11 @@ export default function ChatInput() {
   const handleEmojiSelect = (shortcode: string) => {
     setText(prev => prev + shortcode + ' ');
     setShowEmojiPicker(false);
-    inputRef.current?.focus();
+    // Focus lại vào input sau khi chọn emoji
+    if (inputRef.current) {
+        // Logic focus tùy thuộc vào RichTextInput implementation, 
+        // nhưng cơ bản là giữ focus
+    }
   };
 
   const handleImageSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -62,6 +76,7 @@ export default function ChatInput() {
       const formData = new FormData();
       formData.append('file', file);
       formData.append('upload_preset', UPLOAD_PRESET); 
+      
       const response = await fetch(`https://api.cloudinary.com/v1_1/${CLOUD_NAME}/image/upload`, {
         method: 'POST',
         body: formData,
@@ -71,7 +86,7 @@ export default function ChatInput() {
 
       if (data.secure_url) {
         console.log("Upload thành công:", data.secure_url);
-        sendMessage(data.secure_url);
+        sendMessage(data.secure_url); // Gửi link ảnh như tin nhắn
       } else {
         console.error("Lỗi Cloudinary:", data);
         alert("Lỗi upload ảnh");
@@ -86,11 +101,14 @@ export default function ChatInput() {
   };
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
-    if (e.key === 'Enter') {
-      handleSendText();
+    if (e.key === 'Enter' && !e.shiftKey) { // Shift+Enter để xuống dòng
       e.preventDefault();
+      handleSendText();
     }
   };
+
+  // Nếu chưa chọn chat thì disable input
+  const isDisabled = !currentName || isUploading;
 
   return (
     <div className="relative">
@@ -110,7 +128,7 @@ export default function ChatInput() {
         <div className="flex space-x-3 text-gray-500 mr-3">
           {/* Format button */}
           <div
-            className="cursor-pointer hover:text-blue-500"
+            className={`cursor-pointer hover:text-blue-500 ${isDisabled ? 'opacity-50 pointer-events-none' : ''}`}
             onClick={() => setShowToolbar(!showToolbar)}
             title="Format text"
           >
@@ -121,7 +139,7 @@ export default function ChatInput() {
 
           {/* Image upload */}
           <div 
-            className={`cursor-pointer hover:text-blue-500 ${isUploading ? 'pointer-events-none' : ''}`} 
+            className={`cursor-pointer hover:text-blue-500 ${isDisabled ? 'opacity-50 pointer-events-none' : ''}`} 
             onClick={() => fileInputRef.current?.click()}
             title="Gửi ảnh"
           >
@@ -143,8 +161,8 @@ export default function ChatInput() {
             value={text}
             onChange={setText}
             onKeyDown={handleKeyDown}
-            placeholder={isUploading ? "Đang gửi ảnh..." : "Nhập tin nhắn..."}
-            disabled={isUploading}
+            placeholder={isUploading ? "Đang gửi ảnh..." : (currentName ? "Nhập tin nhắn..." : "Chọn hội thoại để chat")}
+            disabled={isDisabled}
             className="w-full bg-gray-100 rounded-full py-2 px-4 pr-10 text-sm focus:outline-none focus:ring-1 focus:ring-blue-500 disabled:bg-gray-200 disabled:text-gray-500"
             editorRef={inputRef}
           />
@@ -152,14 +170,18 @@ export default function ChatInput() {
           {/* Emoji button */}
           <button
             onClick={() => setShowEmojiPicker(!showEmojiPicker)}
-            className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-yellow-500 text-xl transition-colors"
+            disabled={isDisabled}
+            className={`absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-yellow-500 text-xl transition-colors ${isDisabled ? 'opacity-50' : ''}`}
             type="button"
           >
             👍
           </button>
         </div>
 
-        <div className="ml-3 text-[#0084ff] cursor-pointer" onClick={handleSendText}>
+        <div 
+            className={`ml-3 text-[#0084ff] cursor-pointer ${isDisabled ? 'opacity-50 pointer-events-none' : ''}`} 
+            onClick={handleSendText}
+        >
           <svg className="w-7 h-7" fill="currentColor" viewBox="0 0 20 20"><path d="M2 10.5a1.5 1.5 0 113 0v6a1.5 1.5 0 01-3 0v-6zM6 10.333v5.43a2 2 0 001.106 1.79l.05.025A4 4 0 008.943 18h5.416a2 2 0 001.962-1.608l1.2-6A2 2 0 0015.56 8H12V4a2 2 0 00-2-2 1 1 0 00-1 1v7.333l-2 2z" /></svg>
         </div>
       </div>

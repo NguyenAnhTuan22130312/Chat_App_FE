@@ -2,6 +2,7 @@ import { useAppSelector, useAppDispatch } from '../../hooks/reduxHooks';
 import { setCurrentChat } from '../../store/slices/currentChatSlice';
 import { useUserAvatar } from '../../hooks/useUserAvatar';
 import { useMemo } from 'react';
+import setCurrentPartner from '../../store/slices/chatSlice';
 
 interface ChatListProps {
     searchQuery: string;
@@ -18,6 +19,8 @@ const ChatList = ({ searchQuery }: ChatListProps) => {
             .filter(p => p.name.toLowerCase().includes(searchQuery.toLowerCase()) && p.name !== currentUsername)
             .sort((a, b) => (b.actionTime || 0) > (a.actionTime || 0) ? 1 : -1);
     }, [partners, searchQuery, currentUsername]);
+
+    
 
     return (
         <div className="flex-1 overflow-y-auto px-2 space-y-1 custom-scrollbar">
