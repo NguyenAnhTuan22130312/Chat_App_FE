@@ -82,7 +82,7 @@ const MessageBubble = ({ text, isMe, avatar }: MessageBubbleProps) => {
             ? 'p-0 bg-transparent' 
             : (isMe 
                 ? 'px-4 py-2 bg-[#0084ff] text-white rounded-br-none' 
-                : 'px-4 py-2 bg-[#e4e6eb] text-black rounded-bl-none'
+                : 'px-4 py-2 bg-[#e4e6eb] dark:bg-gray-700 text-black dark:text-white rounded-bl-none'
               )
         }`}
       >

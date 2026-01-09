@@ -83,15 +83,15 @@ const LoginForm: React.FC = () => {
   };
 
   return (
-      <div className="w-1/2 h-screen flex items-center justify-center bg-gray-50 overflow-hidden">
+      <div className="w-1/2 h-screen flex items-center justify-center bg-gray-50 dark:bg-gray-900 overflow-hidden transition-colors duration-200">
         <form
             onSubmit={handleSubmit}
-            className="w-[420px] bg-white rounded-2xl shadow-lg p-12 relative z-10 animate-fade-in-up"
+            className="w-[420px] bg-white dark:bg-gray-800 rounded-2xl shadow-lg p-12 relative z-10 animate-fade-in-up"
         >
-          <h1 className="text-[38px] font-semibold text-gray-900 mb-2 text-center">
+          <h1 className="text-[38px] font-semibold text-gray-900 dark:text-white mb-2 text-center">
             Chào Mừng Trở Lại
           </h1>
-          <p className="text-[17px] text-gray-600 mb-9 text-center">
+          <p className="text-[17px] text-gray-600 dark:text-gray-300 mb-9 text-center">
             Vui lòng đăng nhập vào tài khoản của bạn
           </p>
 
@@ -102,7 +102,7 @@ const LoginForm: React.FC = () => {
           )}
 
           <div className="mb-5">
-            <label className="block text-base font-medium text-gray-700 mb-2">
+            <label className="block text-base font-medium text-gray-700 dark:text-gray-300 mb-2">
               Tên đăng nhập
             </label>
             <div className="relative flex items-center">
@@ -116,14 +116,14 @@ const LoginForm: React.FC = () => {
                   onChange={(e) => setUsername(e.target.value)}
                   onKeyDown={handleUsernameKeyDown}
                   disabled={loading}
-                  className="w-full px-3.5 pl-11 py-3.5 text-base text-gray-700 bg-white border-2 border-gray-300 rounded-lg outline-none transition-all duration-300 ease-in-out focus:border-primary focus:shadow-[0_0_0_3px_rgba(0,132,255,0.1)] disabled:bg-gray-100 disabled:cursor-not-allowed"
+                  className="w-full px-3.5 pl-11 py-3.5 text-base text-gray-700 dark:text-gray-200 bg-white dark:bg-gray-700 border-2 border-gray-300 dark:border-gray-600 rounded-lg outline-none transition-all duration-300 ease-in-out focus:border-primary focus:shadow-[0_0_0_3px_rgba(0,132,255,0.1)] disabled:bg-gray-100 dark:disabled:bg-gray-800 disabled:cursor-not-allowed"
                   placeholder="Nhập tên đăng nhập"
               />
             </div>
           </div>
 
           <div className="mb-5">
-            <label className="block text-base font-medium text-gray-700 mb-2">
+            <label className="block text-base font-medium text-gray-700 dark:text-gray-300 mb-2">
               Mật khẩu
             </label>
             <div className="relative flex items-center">
@@ -136,7 +136,7 @@ const LoginForm: React.FC = () => {
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
                   disabled={loading}
-                  className="w-full px-3.5 pl-11 py-3.5 text-base text-gray-700 bg-white border-2 border-gray-300 rounded-lg outline-none transition-all duration-300 ease-in-out focus:border-primary focus:shadow-[0_0_0_3px_rgba(0,132,255,0.1)] disabled:bg-gray-100 disabled:cursor-not-allowed"
+                  className="w-full px-3.5 pl-11 py-3.5 text-base text-gray-700 dark:text-gray-200 bg-white dark:bg-gray-700 border-2 border-gray-300 dark:border-gray-600 rounded-lg outline-none transition-all duration-300 ease-in-out focus:border-primary focus:shadow-[0_0_0_3px_rgba(0,132,255,0.1)] disabled:bg-gray-100 dark:disabled:bg-gray-800 disabled:cursor-not-allowed"
                   placeholder="Nhập mật khẩu"
               />
               <span
@@ -156,8 +156,8 @@ const LoginForm: React.FC = () => {
             {loading ? 'Đang đăng nhập...' : 'Đăng nhập'}
           </button>
 
-          <div className="text-center text-[15px] text-gray-600">
-            Chưa có tài khoản? <Link to="/register" className="text-primary no-underline cursor-pointer font-semibold transition-opacity duration-200 hover:opacity-70 hover:underline">Đăng ký</Link>
+          <div className="text-center text-[15px] text-gray-600 dark:text-gray-400">
+            Chưa có tài khoản? <Link to="/register" className="text-primary dark:text-blue-400 no-underline cursor-pointer font-semibold transition-opacity duration-200 hover:opacity-70 hover:underline">Đăng ký</Link>
           </div>
         </form>
       </div>

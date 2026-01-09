@@ -8,14 +8,14 @@ interface Props {
 
 export default function EmojiShortcodePicker({ onSelect, onClose }: Props) {
   return (
-    <div className="absolute bottom-16 right-0 z-50 bg-white rounded-lg shadow-2xl border border-gray-200 w-80">
-      <div className="p-3 border-b flex justify-between items-center bg-gray-50">
-        <span className="text-sm font-medium text-gray-700">
-          Chọn Emoji ({EMOJI_LIST.length})
+    <div className="absolute bottom-16 right-0 z-50 bg-white dark:bg-gray-800 rounded-lg shadow-2xl border border-gray-200 dark:border-gray-700 w-80">
+      <div className="p-3 border-b border-gray-200 dark:border-gray-700 flex justify-between items-center bg-gray-50 dark:bg-gray-700">
+        <span className="text-sm font-medium text-gray-700 dark:text-gray-200">
+          Chọn Emoji
         </span>
         <button 
           onClick={onClose}
-          className="text-gray-400 hover:text-gray-600 text-xl font-bold leading-none"
+          className="text-gray-400 dark:text-gray-500 hover:text-gray-600 dark:hover:text-gray-300 text-xl font-bold leading-none transition-colors"
         >
           ×
         </button>
@@ -31,7 +31,7 @@ export default function EmojiShortcodePicker({ onSelect, onClose }: Props) {
                 onClose();
               }}
               title={code}
-              className="text-2xl hover:bg-gray-100 rounded p-2 transition-colors cursor-pointer"
+              className="text-2xl hover:bg-gray-100 dark:hover:bg-gray-700 rounded p-2 transition-colors cursor-pointer"
             >
               {emoji}
             </button>
@@ -40,8 +40,8 @@ export default function EmojiShortcodePicker({ onSelect, onClose }: Props) {
       </div>
 
       {/* Footer hint */}
-      <div className="p-2 border-t bg-gray-50 text-xs text-gray-500 text-center">
-        Hoặc gõ trực tiếp: <code className="bg-gray-200 px-1 rounded">:smile:</code>
+      <div className="p-2 border-t border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-700 text-xs text-gray-500 dark:text-gray-400 text-center">
+        Hoặc gõ trực tiếp: <code className="bg-gray-200 dark:bg-gray-600 dark:text-gray-200 px-1 rounded">:smile:</code>
       </div>
     </div>
   );

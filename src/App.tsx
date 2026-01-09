@@ -9,7 +9,6 @@ import {useAppSelector, useAppDispatch} from "./hooks/reduxHooks";
 import {socketService} from "./services/socketService";
 import {loginRequest, logout,fetchUserAvatar} from "./store/slices/authSlice";
 import {store} from "./store/store";
-import Sidebar from './components/sidebar/Sidebar';
 import Profile from './screens/Profile';
 import ChatList from "./components/sidebar/ChatList";
 
@@ -35,13 +34,13 @@ function HomeLayout() {
     return (
         <div className="flex h-screen w-full overflow-hidden bg-white">
             {/* Sidebar */}
-            <div className="w-[25%] h-full bg-gray-100 border-r border-gray-300 hidden md:flex flex-col">
+            <div className="w-[25%] h-full bg-gray-100 dark:bg-gray-900 border-r border-gray-300 dark:border-gray-700 hidden md:flex flex-col">
                 {/* Sidebar Header */}
-                <div className="p-4 border-b border-gray-300 flex items-center justify-between">
+                <div className="p-4 border-b border-gray-300 dark:border-gray-700 flex items-center justify-between">
                     <div>
-                    <h2 className="text-lg font-bold text-gray-800">Chat App</h2>
+                    <h2 className="text-lg font-bold text-gray-800 dark:text-white">Chat App</h2>
                     {username && (
-                        <p className="text-sm text-gray-600 mt-1">Xin chào, {username}</p>
+                        <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">Xin chào, {username}</p>
                     )}
                     </div>
                 <img
@@ -73,16 +72,25 @@ function HomeLayout() {
                 <div className="p-4 border-t border-gray-300">
                 <div
                         onClick={() => navigate('/profile')}
-                        className="mb-4 flex items-center p-3 bg-white rounded-xl shadow-sm cursor-pointer hover:bg-blue-50 transition-colors border border-transparent hover:border-blue-200"
+                        className="mb-4 flex items-center p-3 bg-white dark:bg-gray-800 rounded-xl shadow-sm cursor-pointer hover:bg-blue-50 dark:hover:bg-gray-700 transition-colors border border-transparent hover:border-blue-200 dark:hover:border-blue-600"
                     >
-                        <div className="p-2 bg-blue-100 rounded-full text-blue-600 mr-3">
-                            <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
-                            </svg>
+                        {/* User Avatar */}
+                        <div className="p-2 bg-blue-100 dark:bg-blue-900/30 rounded-full mr-3 overflow-hidden w-10 h-10 flex items-center justify-center">
+                            {user?.avatar ? (
+                                <img 
+                                    src={user.avatar} 
+                                    alt="Avatar" 
+                                    className="w-full h-full object-cover rounded-full"
+                                />
+                            ) : (
+                                <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 text-blue-600 dark:text-blue-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
+                                </svg>
+                            )}
                         </div>
                         <div>
-                            <p className="font-semibold text-gray-800">Thông tin cá nhân</p>
-                            <p className="text-xs text-gray-500">Đổi avatar, xem thông tin</p>
+                            <p className="font-semibold text-gray-800 dark:text-gray-200">Thông tin cá nhân</p>
+                            <p className="text-xs text-gray-500 dark:text-gray-400">Đổi avatar, xem thông tin</p>
                         </div>
                     </div>
 
@@ -119,7 +127,18 @@ function App() {
     const isAuthenticated = useAppSelector((state) => state.auth.isAuthenticated);
     const socketConnected = useAppSelector((state) => state.auth.socketConnected);
     const socketConnectionError = useAppSelector((state) => state.auth.socketConnectionError);
+    const themeMode = useAppSelector((state) => state.theme.mode);
     const dispatch = useAppDispatch();
+
+    // Thêm chế độ dark mode
+    useEffect(() => {
+        const root = document.documentElement;
+        if (themeMode === 'dark') {
+            root.classList.add('dark');
+        } else {
+            root.classList.remove('dark');
+        }
+    }, [themeMode]);
 
     useEffect(() => {
         const initializeConnection = async () => {
