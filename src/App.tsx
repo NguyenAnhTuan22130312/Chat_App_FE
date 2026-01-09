@@ -11,6 +11,7 @@ import {loginRequest, logout,fetchUserAvatar} from "./store/slices/authSlice";
 import {store} from "./store/store";
 import Sidebar from './components/sidebar/Sidebar';
 import Profile from './screens/Profile';
+import ChatList from "./components/sidebar/ChatList";
 
 
 // Component for Home layout with Sidebar
@@ -23,10 +24,10 @@ function HomeLayout() {
     const handleLogout = () => {
         // Gọi API LOGOUT qua socket
         socketService.logout();
-        
+
         // Dispatch logout action để xoá state
         dispatch(logout());
-        
+
         // Tải lại trang để kết nối lại WebSocket
         window.location.reload();
     };
@@ -34,7 +35,7 @@ function HomeLayout() {
     return (
         <div className="flex h-screen w-full overflow-hidden bg-white">
             {/* Sidebar */}
-            <div className="w-[360px] h-full bg-gray-100 border-r border-gray-300 hidden md:flex flex-col">
+            <div className="w-[25%] h-full bg-gray-100 border-r border-gray-300 hidden md:flex flex-col">
                 {/* Sidebar Header */}
                 <div className="p-4 border-b border-gray-300 flex items-center justify-between">
                     <div>
@@ -43,26 +44,34 @@ function HomeLayout() {
                         <p className="text-sm text-gray-600 mt-1">Xin chào, {username}</p>
                     )}
                     </div>
-                <img 
-                        src={user?.avatar || "https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcT7imMwm5oKZ8t3qnhAptR3ZzpD-i2AuSiHoQ&s"} 
+                <img
+                        src={user?.avatar || "https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcT7imMwm5oKZ8t3qnhAptR3ZzpD-i2AuSiHoQ&s"}
                         alt="My Avatar"
-                        className="w-12 h-12 rounded-full object-cover border border-gray-300 ml-3" 
+                        className="w-12 h-12 rounded-full object-cover border border-gray-300 ml-3"
                     />
                 </div>
-                
-                {/* Sidebar Content - Chat list area */}
-                <div className="flex-1 overflow-y-auto p-4">
 
-                
+                {/* Sidebar Content - Danh sách chat mới (Trung Han build) */}
+                <div className="flex-1 overflow-y-auto flex flex-col">
+                    {/* Search bar */}
+                    <div className="p-4">
+                        <input
+                            type="text"
+                            placeholder="Tìm kiếm người hoặc phòng..."
+                            className="w-full px-4 py-2.5 rounded-full bg-gray-200 dark:bg-gray-700 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500 transition"
+                            // Bạn có thể thêm state search ở đây sau nếu muốn, tạm thời để static đẹp trước
+                        />
+                    </div>
 
-                    <span className="text-gray-400 text-sm">
-                        Sidebar Area <br/> (Danh sách chat - Trung Han)
-                    </span>
+                    {/* Danh sách cuộc trò chuyện */}
+                    <div className="flex-1 overflow-y-auto px-2">
+                        <ChatList searchQuery={""} />
+                    </div>
                 </div>
 
                 {/* Logout Button at bottom */}
                 <div className="p-4 border-t border-gray-300">
-                <div 
+                <div
                         onClick={() => navigate('/profile')}
                         className="mb-4 flex items-center p-3 bg-white rounded-xl shadow-sm cursor-pointer hover:bg-blue-50 transition-colors border border-transparent hover:border-blue-200"
                     >
@@ -81,16 +90,16 @@ function HomeLayout() {
                         onClick={handleLogout}
                         className="w-full py-2 px-4 bg-red-500 hover:bg-red-600 text-white font-semibold rounded-lg transition-colors duration-200 flex items-center justify-center gap-2"
                     >
-                        <svg 
-                            xmlns="http://www.w3.org/2000/svg" 
-                            className="h-5 w-5" 
-                            viewBox="0 0 20 20" 
+                        <svg
+                            xmlns="http://www.w3.org/2000/svg"
+                            className="h-5 w-5"
+                            viewBox="0 0 20 20"
                             fill="currentColor"
                         >
-                            <path 
-                                fillRule="evenodd" 
-                                d="M3 3a1 1 0 00-1 1v12a1 1 0 102 0V4a1 1 0 00-1-1zm10.293 9.293a1 1 0 001.414 1.414l3-3a1 1 0 000-1.414l-3-3a1 1 0 10-1.414 1.414L14.586 9H7a1 1 0 100 2h7.586l-1.293 1.293z" 
-                                clipRule="evenodd" 
+                            <path
+                                fillRule="evenodd"
+                                d="M3 3a1 1 0 00-1 1v12a1 1 0 102 0V4a1 1 0 00-1-1zm10.293 9.293a1 1 0 001.414 1.414l3-3a1 1 0 000-1.414l-3-3a1 1 0 10-1.414 1.414L14.586 9H7a1 1 0 100 2h7.586l-1.293 1.293z"
+                                clipRule="evenodd"
                             />
                         </svg>
                         Đăng xuất
@@ -115,7 +124,7 @@ function App() {
     useEffect(() => {
         const initializeConnection = async () => {
             await socketService.connect();
-            
+
             // Chỉ tự động đăng nhập nếu đã xác thực
             if (isAuthenticated) {
                 const reLoginCode = localStorage.getItem('reLoginCode');
@@ -164,9 +173,9 @@ function App() {
                     }
                 />
 
-                <Route 
-                    path="/profile" 
-                    element={isAuthenticated ? <Profile /> : <Navigate to="/login" replace />} 
+                <Route
+                    path="/profile"
+                    element={isAuthenticated ? <Profile /> : <Navigate to="/login" replace />}
                 />
 
                 {/* Protected Route - Trang Home/Chat */}
