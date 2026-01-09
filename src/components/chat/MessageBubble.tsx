@@ -1,5 +1,6 @@
 import React from 'react';
 import { replaceEmojiShortcodes } from '../../utils/emojiShortcodes';
+import { COLOR_MAP } from '../../constants/colors';
 
 interface MessageBubbleProps {
   text: string;
@@ -7,7 +8,7 @@ interface MessageBubbleProps {
   avatar?: string;
 }
 
-export default function MessageBubble({ text, isMe, avatar }: MessageBubbleProps) {
+const MessageBubble = ({ text, isMe, avatar }: MessageBubbleProps) => {
   const isImageUrl = (url: string) => {
     if (!url) return false;
     const hasImageExtension = /\.(jpeg|jpg|gif|png|webp|bmp)$/i.test(url);
@@ -45,21 +46,7 @@ export default function MessageBubble({ text, isMe, avatar }: MessageBubbleProps
   const renderMarkdown = (text: string) => {
     let html = text;
     
-    // Color tags: [color]text[/color]
-    const colorMap: Record<string, string> = {
-      red: '#FF0000',
-      blue: '#0084FF',
-      green: '#00C851',
-      yellow: '#FFD700',
-      purple: '#9C27B0',
-      orange: '#FF9800',
-      pink: '#E91E63',
-      brown: '#795548',
-      gray: '#9E9E9E',
-      black: '#000000',
-    };
-    
-    Object.entries(colorMap).forEach(([name, hex]) => {
+    Object.entries(COLOR_MAP).forEach(([name, hex]) => {
       const regex = new RegExp(`\\[${name}\\](.+?)\\[\\/${name}\\]`, 'g');
       html = html.replace(regex, `<span style="color:${hex}">$1</span>`);
     });
@@ -123,4 +110,6 @@ export default function MessageBubble({ text, isMe, avatar }: MessageBubbleProps
       </div>
     </div>
   );
-}
+};
+
+export default React.memo(MessageBubble);

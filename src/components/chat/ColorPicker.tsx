@@ -1,17 +1,5 @@
 import React from 'react';
-
-const PRESET_COLORS = [
-  { name: 'Đỏ', value: '#FF0000', hex: 'red' },
-  { name: 'Xanh dương', value: '#0084FF', hex: 'blue' },
-  { name: 'Xanh lá', value: '#00C851', hex: 'green' },
-  { name: 'Vàng', value: '#FFD700', hex: 'yellow' },
-  { name: 'Tím', value: '#9C27B0', hex: 'purple' },
-  { name: 'Cam', value: '#FF9800', hex: 'orange' },
-  { name: 'Hồng', value: '#E91E63', hex: 'pink' },
-  { name: 'Nâu', value: '#795548', hex: 'brown' },
-  { name: 'Xám', value: '#9E9E9E', hex: 'gray' },
-  { name: 'Đen', value: '#000000', hex: 'black' },
-];
+import { PRESET_COLORS } from '../../constants/colors';
 
 interface Props {
   onSelectColor: (colorHex: string) => void;

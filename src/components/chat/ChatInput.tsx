@@ -6,6 +6,9 @@ import EmojiShortcodePicker from './EmojiShortcodePicker';
 import MarkdownToolbar from './MarkdownToolbar';
 import RichTextInput from './RichTextInput';
 
+const CLOUD_NAME = "dox9vbxjn";
+const UPLOAD_PRESET = "chat_app_preset";
+
 export default function ChatInput() {
   const [text, setText] = useState('');
   const [isUploading, setIsUploading] = useState(false); 
@@ -16,10 +19,7 @@ export default function ChatInput() {
   
   const { name: currentName, type: currentType } = useAppSelector(state => state.currentChat);
   const { user } = useAppSelector((state) => state.auth);
-  const dispatch = useAppDispatch();
-
-  const CLOUD_NAME = "dox9vbxjn"; 
-  const UPLOAD_PRESET = "chat_app_preset"; 
+  const dispatch = useAppDispatch(); 
 
   const sendMessage = async (content: string) => {
     if (!currentName || !currentType) return;
@@ -32,15 +32,13 @@ export default function ChatInput() {
     };
     dispatch(addMessage(tempMessage));
 
-    // 2. Gửi qua Socket
     try {
       await socketService.connect();
       
-      // SỬA: Kiểm tra loại chat để gọi hàm socket tương ứng
       if (currentType === 'room') {
-          socketService.sendMessageToRoom(currentName, content);
+        socketService.sendMessageToRoom(currentName, content);
       } else {
-          socketService.sendMessageToPeople(currentName, content);
+        socketService.sendMessageToPeople(currentName, content);
       }
       
     } catch (error) {
@@ -57,11 +55,7 @@ export default function ChatInput() {
   const handleEmojiSelect = (shortcode: string) => {
     setText(prev => prev + shortcode + ' ');
     setShowEmojiPicker(false);
-    // Focus lại vào input sau khi chọn emoji
-    if (inputRef.current) {
-        // Logic focus tùy thuộc vào RichTextInput implementation, 
-        // nhưng cơ bản là giữ focus
-    }
+    inputRef.current?.focus();
   };
 
   const handleImageSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {

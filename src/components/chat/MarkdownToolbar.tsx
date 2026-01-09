@@ -5,6 +5,26 @@ interface Props {
   editorRef: React.RefObject<HTMLDivElement | null>;
 }
 
+interface ToolButtonProps {
+  label: string | React.ReactNode;
+  onClick: () => void;
+  title: string;
+}
+
+const ToolButton = React.memo(({ label, onClick, title }: ToolButtonProps) => (
+  <button
+    type="button"
+    onClick={onClick}
+    onMouseDown={(e) => e.preventDefault()}
+    title={title}
+    className="px-3 py-1 text-sm font-semibold text-gray-700 hover:bg-gray-200 rounded transition-colors"
+  >
+    {label}
+  </button>
+));
+
+ToolButton.displayName = 'ToolButton';
+
 export default function MarkdownToolbar({ editorRef }: Props) {
   const [showColorPicker, setShowColorPicker] = useState(false);
 
@@ -51,26 +71,6 @@ export default function MarkdownToolbar({ editorRef }: Props) {
     wrapSelection(`[${colorHex}]`, `[/${colorHex}]`);
     setShowColorPicker(false);
   };
-
-  const ToolButton = ({ 
-    label, 
-    onClick, 
-    title 
-  }: { 
-    label: string | React.ReactNode; 
-    onClick: () => void; 
-    title: string;
-  }) => (
-    <button
-      type="button"
-      onClick={onClick}
-      onMouseDown={(e) => e.preventDefault()}
-      title={title}
-      className="px-3 py-1 text-sm font-semibold text-gray-700 hover:bg-gray-200 rounded transition-colors"
-    >
-      {label}
-    </button>
-  );
 
   return (
     <div className="relative">

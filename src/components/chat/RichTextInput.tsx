@@ -1,5 +1,6 @@
 import React, { useEffect, useRef, useState, useCallback } from 'react';
 import { replaceEmojiShortcodes } from '../../utils/emojiShortcodes';
+import { COLOR_MAP, getColorName } from '../../constants/colors';
 
 interface Props {
   value: string;
@@ -47,20 +48,7 @@ export default function RichTextInput({
     
     html = html.replace(/__([^_]+)__/g, '<u>$1</u>');
     
-    const colorMap: Record<string, string> = {
-      red: '#FF0000',
-      blue: '#0084FF',
-      green: '#00C851',
-      yellow: '#FFD700',
-      purple: '#9C27B0',
-      orange: '#FF9800',
-      pink: '#E91E63',
-      brown: '#795548',
-      gray: '#9E9E9E',
-      black: '#000000',
-    };
-    
-    Object.entries(colorMap).forEach(([name, hex]) => {
+    Object.entries(COLOR_MAP).forEach(([name, hex]) => {
       const regex = new RegExp(`\\[${name}\\]([^\\[]+)\\[\\/${name}\\]`, 'g');
       html = html.replace(regex, `<span style="color:${hex}">$1</span>`);
     });
@@ -91,38 +79,7 @@ export default function RichTextInput({
         case 'SPAN':
           const color = element.style.color;
           if (color) {
-            // Convert RGB to color name
-            const colorMap: Record<string, string> = {
-              'rgb(255, 0, 0)': 'red',
-              '#FF0000': 'red',
-              '#ff0000': 'red',
-              'rgb(0, 132, 255)': 'blue',
-              '#0084FF': 'blue',
-              '#0084ff': 'blue',
-              'rgb(0, 200, 81)': 'green',
-              '#00C851': 'green',
-              '#00c851': 'green',
-              'rgb(255, 215, 0)': 'yellow',
-              '#FFD700': 'yellow',
-              '#ffd700': 'yellow',
-              'rgb(156, 39, 176)': 'purple',
-              '#9C27B0': 'purple',
-              '#9c27b0': 'purple',
-              'rgb(255, 152, 0)': 'orange',
-              '#FF9800': 'orange',
-              '#ff9800': 'orange',
-              'rgb(233, 30, 99)': 'pink',
-              '#E91E63': 'pink',
-              '#e91e63': 'pink',
-              'rgb(121, 85, 72)': 'brown',
-              '#795548': 'brown',
-              'rgb(158, 158, 158)': 'gray',
-              '#9E9E9E': 'gray',
-              '#9e9e9e': 'gray',
-              'rgb(0, 0, 0)': 'black',
-              '#000000': 'black',
-            };
-            const colorName = colorMap[color] || colorMap[color.toLowerCase()];
+            const colorName = getColorName(color);
             if (colorName) {
               return `[${colorName}]${children}[/${colorName}]`;
             }
