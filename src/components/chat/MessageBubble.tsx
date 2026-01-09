@@ -15,6 +15,7 @@ const MessageBubble = ({ text, isMe, avatar }: MessageBubbleProps) => {
     const isKnownImageHost = url.startsWith('http') && (
         url.includes('cloudinary.com') || 
         url.includes('imgur.com') ||
+        url.includes('giphy.com') ||
         url.includes('blob:')
     );
 
