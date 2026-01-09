@@ -10,6 +10,7 @@ import {addMessage, setMessages} from "../store/slices/chatSlice";
 import {store} from "../store/store";
 import {ChatPartner, setPartners} from "../store/slices/chatPartnerSlice";
 import { setLastMessage } from "../store/slices/lastMessageSlice";
+import { increaseUnread } from "../store/slices/unreadSlice";
 
 
 const SOCKET_URL = 'wss://chat.longapp.site/chat/chat';
@@ -155,8 +156,6 @@ class SocketService {
                     if (Array.isArray(responseData) && responseData.length > 0) {
                         const lastMsg = responseData[0];
 
-                        // FIX: partnerName là tên người còn lại, không phải "to"
-                        // Vì "to" là người nhận tin nhắn cuối, có thể là mình hoặc đối phương
                         const currentUsername = localStorage.getItem('username') || '';
                         const partnerName = lastMsg.name === currentUsername ? lastMsg.to : lastMsg.name;
 
@@ -195,26 +194,62 @@ class SocketService {
 
                 case 'SEND_CHAT':
                     if (responseData) {
-                        // Giữ nguyên: thêm tin nhắn vào lịch sử chat hiện tại (cho ChatWindow bên phải)
+                        // 1. Add tin nhắn vào store (giữ nguyên code cũ của bạn)
                         store.dispatch(addMessage(responseData));
 
-                        // Mới thêm: cập nhật last message cho Sidebar
-                        const { to, mes, name: senderName, createAt } = responseData;
+                        const { to, mes, name: senderName, createAt, type } = responseData;
+                        const currentUsername = localStorage.getItem('username') || '';
 
+                        // Chuẩn hóa loại chat (API của bạn lúc thì trả về string 'room', lúc thì số 1/0 nên check cả 2 cho chắc)
+                        const isRoom = type === 'room' || type === 1;
+                        const isPeople = type === 'people' || type === 0;
+
+                        // 2. Cập nhật Last Message (Tin nhắn cuối)
                         if (to && mes) {
-                            const partnerName = to; // "to" chính là tên room hoặc tên người nhận
+                            // Logic xác định đối tượng chat để hiển thị ở Sidebar:
+                            // - Nếu là Room: LastMessage gán cho tên Room (biến 'to')
+                            // - Nếu là People:
+                            //    + Người khác gửi mình -> Gán cho người gửi ('senderName')
+                            //    + Mình gửi người khác -> Gán cho người nhận ('to')
+                            let partnerNameForLastMsg = to;
+                            if (isPeople && senderName !== currentUsername) {
+                                partnerNameForLastMsg = senderName;
+                            }
+
                             const timestamp = createAt || new Date().toISOString();
 
                             store.dispatch(setLastMessage({
-                                partnerName,
+                                partnerName: partnerNameForLastMsg,
                                 message: mes,
                                 timestamp,
                                 senderName: senderName || 'Unknown',
                             }));
 
-                            // Optional: refresh list để sort lại theo hoạt động mới nhất
-                            // (an toàn vì actionTime sẽ update)
-                            socketService.getUserList();
+                            // Gọi refresh list user để sort lại thứ tự (người mới nhắn nhảy lên đầu)
+                            // socketService.getUserList(); // Có thể bật lại nếu server không tự push event update list
+                        }
+
+                        // === 3. FIX LOGIC UNREAD (TĂNG SỐ TIN CHƯA ĐỌC) ===
+                        // Điều kiện: Không phải tin mình gửi đi
+                        if (senderName !== currentUsername) {
+
+                            // Xác định ai là người cần hiện dấu đỏ (Key trong object unreadCounts)
+                            // - Chat nhóm: Key là tên phòng ('to')
+                            // - Chat riêng: Key là tên thằng gửi ('senderName')
+                            const targetUnreadKey = isRoom ? to : senderName;
+
+                            // Kiểm tra xem mình có đang mở chat với đối tượng này không?
+                            const currentChat = store.getState().currentChat;
+
+                            // So sánh tên và loại (để tránh trùng tên giữa user và room)
+                            const isViewingThisChat =
+                                currentChat.name === targetUnreadKey &&
+                                currentChat.type === (isRoom ? 'room' : 'people');
+
+                            // Nếu KHÔNG ĐANG XEM thì mới tăng số tin chưa đọc
+                            if (!isViewingThisChat) {
+                                store.dispatch(increaseUnread(targetUnreadKey));
+                            }
                         }
                     }
                     break;
