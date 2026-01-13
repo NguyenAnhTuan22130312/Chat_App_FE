@@ -6,18 +6,19 @@ import {
     socketDisconnected,
     socketConnectionError
 } from "../store/slices/authSlice";
-import { addMessage, setMessages } from "../store/slices/chatSlice";
-import { store } from "../store/store";
-import { ChatPartner, setPartners } from "../store/slices/chatPartnerSlice";
-import { setLastMessage } from "../store/slices/lastMessageSlice";
+import {addMessage, ChatMessage, clearMessages, setMessages} from "../store/slices/chatSlice";
+import {store} from "../store/store";
+import {ChatPartner, setPartners, updatePartnerOnline} from "../store/slices/chatPartnerSlice";
+import {increaseUnread} from "../store/slices/unreadSlice";
 
 const SOCKET_URL = 'wss://chat.longapp.site/chat/chat';
 const HEARTBEAT_INTERVAL = 30000;
 const RECONNECT_DELAY = 3000;
 const MAX_RECONNECT_ATTEMPTS = 5;
 
+
 const CHAT_WHITELIST = [
-    '22130302', 'ABC', 'trunghan', 'anhtuan12', 'hantr', 'long', 'hant123'
+    '22130302', 'trunghan', 'anhtuan12', 'hantr', 'long'
 ];
 
 class SocketService {
@@ -28,6 +29,7 @@ class SocketService {
     private heartbeatInterval: NodeJS.Timeout | null = null;
     private shouldReconnect: boolean = true;
     private reconnectAttempts: number = 0;
+    private checkOnlineQueue: string[] = [];
 
     connect(): Promise<void> {
         if (this.socket && this.socket.readyState === WebSocket.OPEN) {
@@ -79,8 +81,8 @@ class SocketService {
 
     private handleServerResponse(receivedData: any) {
         const payload = receivedData.action === 'onchat' ? receivedData.data : receivedData;
-        const { event, status, data: responseData } = payload;
-        
+        const {event, status, data: responseData} = payload;
+
         // Lấy thông tin chat hiện tại từ Redux store để so sánh
         const currentChatState = store.getState().currentChat;
         const myUsername = store.getState().auth.user?.username || localStorage.getItem('username');
@@ -91,7 +93,7 @@ class SocketService {
                 case 'RE_LOGIN':
                     const reLoginCode = responseData?.RE_LOGIN_CODE;
                     store.dispatch(loginSuccess({
-                        user: { username: myUsername || '' },
+                        user: {username: myUsername || ''},
                         reLoginCode: reLoginCode,
                     }));
                     this.getUserList();
@@ -100,101 +102,168 @@ class SocketService {
                 case 'REGISTER':
                     store.dispatch(registerSuccess());
                     store.dispatch(loginSuccess({
-                        user: { username: myUsername || '' },
+                        user: {username: myUsername || ''},
                         reLoginCode: responseData?.RE_LOGIN_CODE,
                     }));
                     this.getUserList();
                     break;
 
                 case 'GET_PEOPLE_CHAT_MES':
+                    // Case này hơi khó vì nếu mảng rỗng thì không biết ai là partner để set
                     if (Array.isArray(responseData) && responseData.length > 0) {
                         const lastMsg = responseData[0];
+
+                        // Logic xác định mình đang chat với ai
                         const partnerName = lastMsg.name === myUsername ? lastMsg.to : lastMsg.name;
 
-                        store.dispatch(setLastMessage({
-                            partnerName,
-                            message: lastMsg.mes,
-                            timestamp: lastMsg.createAt || new Date().toISOString(),
-                            senderName: lastMsg.name,
+                        // 1. Chuẩn hóa dữ liệu (Reverse để tin mới nhất ở dưới cùng)
+                        const history = [...responseData].reverse();
+
+                        // 2. Dispatch vào Slice Mới
+                        // LƯU Ý: Không cần check currentChatState.name === partnerName
+                        // Cứ lưu vào store, dù user có đang xem hay không.
+                        store.dispatch(setMessages({
+                            target: partnerName,
+                            messages: history
                         }));
 
-                        if (currentChatState.type === 'people' && currentChatState.name === partnerName) {
-                            const history = [...responseData].reverse();
-                            store.dispatch(setMessages(history));
-                        }
                     } else if (Array.isArray(responseData) && responseData.length === 0) {
-                         if (currentChatState.type === 'people') {
-                             store.dispatch(setMessages([]));
-                         }
+                        // Nếu mảng rỗng, ta chỉ có thể clear nếu đang mở đúng chat đó
+                        // (Do API không trả về tên người khi mảng rỗng)
+                        if (currentChatState.type === 'people' && currentChatState.name) {
+                            store.dispatch(setMessages({
+                                target: currentChatState.name,
+                                messages: []
+                            }));
+                        }
                     }
                     break;
 
                 case 'GET_ROOM_CHAT_MES':
-                    if (responseData && responseData.chatData) {
+                    if (responseData && responseData.name) { // Check kỹ hơn chút
                         const roomName = responseData.name;
-                        const chatData = responseData.chatData;
+                        const chatData = responseData.chatData || []; // Fallback nếu null
 
-                        if (chatData.length > 0) {
-                            const lastMsgRaw = chatData[0];
-                            store.dispatch(setLastMessage({
-                                partnerName: roomName,
-                                message: lastMsgRaw.mes,
-                                timestamp: lastMsgRaw.createAt || new Date().toISOString(),
-                                senderName: lastMsgRaw.name,
-                            }));
-                        }
+                        // 1. Chuẩn hóa dữ liệu
+                        const history = [...chatData].reverse();
 
-                        if (currentChatState.type === 'room' && currentChatState.name === roomName) {
-                            const history = [...chatData].reverse();
-                            store.dispatch(setMessages(history));
-                        }
+                        // 2. Dispatch vào Slice Mới
+                        // Tương tự, lưu luôn vào store theo target là tên phòng
+                        store.dispatch(setMessages({
+                            target: roomName,
+                            messages: history
+                        }));
                     }
                     break;
 
                 case 'SEND_CHAT':
-                    if (responseData) {
-                        const { to, mes, name: senderName, createAt, type } = responseData;
-                        const isMyMessage = senderName === myUsername;
-                        
-                        const isRelevantToCurrentChat = 
-                            (type === 'room' && to === currentChatState.name) ||
-                            (type === 'people' && (to === currentChatState.name || senderName === currentChatState.name));
+                    console.group("🔥 DEBUG: SEND_CHAT Event");
+                    console.log("1. Raw Data from Server:", responseData);
 
-                        if (isRelevantToCurrentChat) {
-                            store.dispatch(addMessage(responseData));
+                    if (responseData) {
+                        const rawData = responseData;
+
+                        const { to, mes, name: senderName, type, createAt } = rawData;
+
+                        if (!to || !senderName) {
+                            console.error(" Dữ liệu tin nhắn thiếu 'to' hoặc 'senderName'", rawData);
+                            console.groupEnd();
+                            break;
                         }
 
-                        const partnerForSidebar = type === 'room' ? to : (isMyMessage ? to : senderName);
-                        store.dispatch(setLastMessage({
-                            partnerName: partnerForSidebar,
-                            message: mes,
-                            timestamp: createAt || new Date().toISOString(),
-                            senderName: senderName,
+                        const messageType = (type === 1 || type === 'room') ? 'room' : 'people';
+
+                        let target = '';
+                        if (messageType === 'room') {
+                            target = to;
+                        } else {
+                            target = senderName === myUsername ? to : senderName;
+                        }
+
+                        console.log(`2. Logic Check:`);
+                        console.log(`   - My Username: ${myUsername}`);
+                        console.log(`   - Sender: ${senderName}`);
+                        console.log(`   - To: ${to}`);
+                        console.log(`   => CALCULATED TARGET: "${target}"`);
+
+                        const newMessage: ChatMessage = {
+
+                            name: senderName,
+                            to: to,
+                            mes: mes,
+                            type: messageType,
+                            createAt: createAt || new Date().toISOString()
+                        };
+
+                        console.log("3. Dispatching addMessage action...");
+                        store.dispatch(addMessage({
+                            target: target,
+                            message: newMessage
                         }));
-                        
-                        this.getUserList();
+
+                        const state = store.getState();
+                        const currentChat = state.currentChat;
+
+                        // Nếu tin nhắn KHÔNG PHẢI do mình gửi
+                        // VÀ (mình đang không mở chat HOẶC đang mở chat với người khác)
+                        const isMyMessage = senderName === myUsername;
+
+                        if (!isMyMessage) {
+                            if (currentChat.name !== target) {
+                                store.dispatch(increaseUnread(target));
+                            }
+                        }
                     }
+                    console.groupEnd();
+
+
                     break;
 
                 case 'GET_USER_LIST':
+
+                    // console.group("🔍 DEBUG GET_USER_LIST");
+                    // console.log("1. Raw Response Data:", responseData);
+                    // console.log("2. Total count from Server:", Array.isArray(responseData) ? responseData.length : 'Not Array');
+
                     if (Array.isArray(responseData)) {
-                        // FIX LỖI Ở ĐÂY: Ép kiểu 'room' | 'people'
-                        const partners: ChatPartner[] = responseData.map((item: any) => ({
+                        // 1. Map dữ liệu thô sang format chuẩn
+                        let allPartners: ChatPartner[] = responseData.map((item: any) => ({
                             name: item.name,
                             type: (item.type === 1 ? 'room' : 'people') as 'room' | 'people',
                             actionTime: item.actionTime,
-                        })).sort((a, b) => {
+                            isOnline: false,
+                        }));
+
+
+                        // 2. LỌC NGAY TẠI ĐÂY (Logic Whitelist)
+                        // Chỉ giữ lại những người có tên trong CHAT_WHITELIST
+                        const whitelistedPartners = allPartners.filter(p => CHAT_WHITELIST.includes(p.name));
+
+                        // 3. Sắp xếp (nếu cần)
+                        whitelistedPartners.sort((a, b) => {
                             if (!a.actionTime || !b.actionTime) return 0;
                             return new Date(b.actionTime).getTime() - new Date(a.actionTime).getTime();
+                            console.log(a.actionTime,b.actionTime);
                         });
 
-                        store.dispatch(setPartners(partners));
+                        // 4. DISPATCH (Lúc này trong Slice chỉ có những người trong Whitelist)
+                        store.dispatch(setPartners(whitelistedPartners));
 
-                        const partnersToLoad = partners.filter(p => CHAT_WHITELIST.includes(p.name));
-                        partnersToLoad.forEach((partner, index) => {
+                        this.checkOnlineQueue = [];
+
+                        // 5. Chạy vòng lặp lấy dữ liệu chi tiết (Dùng chính list đã lọc để chạy)
+                        whitelistedPartners.forEach((partner, index) => {
                             setTimeout(() => {
-                                if (partner.type === 'people') this.getHistory(partner.name);
-                                else if (partner.type === 'room') this.getRoomHistory(partner.name, 1);
+                                if (partner.type === 'people') {
+                                    // A. Ghi tên vào hàng đợi (Xếp hàng)
+                                    this.checkOnlineQueue.push(partner.name);
+
+                                    // B. Gửi câu hỏi lên Server
+                                    this.checkUserOnline(partner.name);
+                                    this.getHistory(partner.name);
+                                } else if (partner.type === 'room') {
+                                    this.getRoomHistory(partner.name, 1);
+                                }
                             }, index * 300);
                         });
                     }
@@ -204,15 +273,26 @@ class SocketService {
                 case 'JOIN_ROOM':
                     this.getUserList();
                     break;
-                    
+
                 case 'CHECK_USER_ONLINE':
-                    console.log('Online status:', responseData.status);
+
+                    if (responseData) {
+                        const isOnline = responseData.status;
+                        const targetUser = this.checkOnlineQueue.shift();
+
+                        if (targetUser) {
+                            store.dispatch(updatePartnerOnline({
+                                name: targetUser,
+                                isOnline: isOnline
+                            }));
+                        }
+                    }
                     break;
             }
         } else if (status === 'error') {
             const errorMessage = payload.mes || 'Có lỗi xảy ra';
             console.error('Socket Error:', errorMessage);
-            
+
             if (errorMessage === 'User not Login') {
                 const user = localStorage.getItem('username');
                 const code = localStorage.getItem('reLoginCode');
@@ -248,7 +328,7 @@ class SocketService {
 
     private send(payload: any) {
         if (this.socket && this.socket.readyState === WebSocket.OPEN) {
-            this.socket.send(JSON.stringify({ action: 'onchat', data: payload }));
+            this.socket.send(JSON.stringify({action: 'onchat', data: payload}));
         } else {
             console.error('Socket not connected');
         }
@@ -256,57 +336,57 @@ class SocketService {
 
     register(user: string, pass: string) {
         localStorage.setItem('username', user);
-        this.send({ event: 'REGISTER', data: { user, pass } });
+        this.send({event: 'REGISTER', data: {user, pass}});
     }
 
     login(user: string, pass: string) {
         localStorage.setItem('username', user);
-        this.send({ event: 'LOGIN', data: { user, pass } });
+        this.send({event: 'LOGIN', data: {user, pass}});
     }
 
     reLogin(user: string, code: string) {
-        this.send({ event: 'RE_LOGIN', data: { user, code } });
+        this.send({event: 'RE_LOGIN', data: {user, code}});
     }
 
     logout() {
         this.shouldReconnect = false;
-        this.send({ event: 'LOGOUT' });
+        this.send({event: 'LOGOUT'});
     }
 
     sendMessageToPeople(toUser: string, message: string) {
-        this.send({ event: 'SEND_CHAT', data: { type: 'people', to: toUser, mes: message } });
+        this.send({event: 'SEND_CHAT', data: {type: 'people', to: toUser, mes: message}});
     }
 
     getHistory(partnerName: string) {
-        this.send({ event: 'GET_PEOPLE_CHAT_MES', data: { name: partnerName, page: 1 } });
+        this.send({event: 'GET_PEOPLE_CHAT_MES', data: {name: partnerName, page: 1}});
     }
 
     getRoomHistory(roomName: string, page: number = 1) {
-        this.send({ event: 'GET_ROOM_CHAT_MES', data: { name: roomName, page } });
+        this.send({event: 'GET_ROOM_CHAT_MES', data: {name: roomName, page}});
     }
 
     sendMessageToRoom(roomName: string, message: string) {
-        this.send({ event: 'SEND_CHAT', data: { type: 'room', to: roomName, mes: message } });
+        this.send({event: 'SEND_CHAT', data: {type: 'room', to: roomName, mes: message}});
     }
 
     getUserList() {
-        this.send({ event: 'GET_USER_LIST' });
+        this.send({event: 'GET_USER_LIST'});
     }
 
     createRoom(roomName: string) {
-        this.send({ event: 'CREATE_ROOM', data: { name: roomName } });
+        this.send({event: 'CREATE_ROOM', data: {name: roomName}});
     }
 
     joinRoom(roomName: string) {
-        this.send({ event: 'JOIN_ROOM', data: { name: roomName } });
+        this.send({event: 'JOIN_ROOM', data: {name: roomName}});
     }
-    
+
     checkUserExist(username: string) {
-        this.send({ event: 'CHECK_USER_EXIST', data: { user: username } });
+        this.send({event: 'CHECK_USER_EXIST', data: {user: username}});
     }
-    
+
     checkUserOnline(username: string) {
-        this.send({ event: 'CHECK_USER_ONLINE', data: { user: username } });
+        this.send({event: 'CHECK_USER_ONLINE', data: {user: username}});
     }
 
     disconnect() {
@@ -314,7 +394,7 @@ class SocketService {
         this.stopHeartbeat();
         this.socket?.close();
     }
-    
+
     reconnect() {
         this.disconnect();
         return this.connect();

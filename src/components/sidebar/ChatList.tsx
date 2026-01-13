@@ -3,6 +3,7 @@ import { setCurrentChat } from '../../store/slices/currentChatSlice';
 import { useUserAvatar } from '../../hooks/useUserAvatar';
 import { useMemo } from 'react';
 import { replaceEmojiShortcodes } from '../../utils/emojiShortcodes';
+import {clearUnread} from "../../store/slices/unreadSlice";
 
 interface ChatListProps {
     searchQuery: string;
@@ -34,8 +35,12 @@ const ChatList = ({ searchQuery }: ChatListProps) => {
                     <ChatListItem
                         key={`${partner.type}-${partner.name}`}
                         partner={partner}
-                        isActive={currentChat.name === partner.name && currentChat.type === partner.type}
-                        onClick={() => dispatch(setCurrentChat({ name: partner.name, type: partner.type }))}
+                        isActive={currentChat.name === partner.name}
+                        onClick={() => {
+                            dispatch(setCurrentChat({ name: partner.name, type: partner.type }));
+
+                            dispatch(clearUnread(partner.name));
+                        }}
                     />
                 ))
             )}
@@ -43,33 +48,99 @@ const ChatList = ({ searchQuery }: ChatListProps) => {
     );
 };
 
+// Hàm tính khoảng cách thời gian
+const formatTimeAgo = (dateString?: string) => {
+    if (!dateString) return '';
+
+    // --- LOGIC FIX MÚI GIỜ (UTC -> Local) ---
+    // Kiểm tra xem chuỗi có chữ 'Z' ở cuối chưa.
+    // Nếu chưa, ta cộng thêm 'Z' vào để trình duyệt hiểu đây là giờ UTC.
+    // Khi đó: new Date() sẽ tự động +7 tiếng (theo giờ máy tính của bạn).
+    let isoTime = dateString;
+    if (!isoTime.endsWith('Z')) {
+        isoTime = isoTime + 'Z';
+    }
+
+    const date = new Date(isoTime);
+    const now = new Date();
+
+    // Tính khoảng cách (giây)
+    const diffInSeconds = Math.floor((now.getTime() - date.getTime()) / 1000);
+
+    // --- FIX LOGIC HIỂN THỊ TƯƠNG LAI ---
+    // Trường hợp lệch vài giây do độ trễ mạng khiến date > now (diff bị âm)
+    // Ta coi như là "Vừa xong" luôn
+    if (diffInSeconds < 0) return 'Vừa xong';
+
+    // Xử lý các mốc thời gian
+    if (diffInSeconds < 60) return 'Vừa xong';
+    if (diffInSeconds < 3600) return `${Math.floor(diffInSeconds / 60)} phút`;
+    if (diffInSeconds < 86400) return `${Math.floor(diffInSeconds / 3600)} giờ`;
+    if (diffInSeconds < 604800) return `${Math.floor(diffInSeconds / 86400)} ngày`;
+
+    // Nếu quá 7 ngày thì hiện ngày tháng
+    return `${date.getDate()}/${date.getMonth() + 1}`;
+};
+
 const ChatListItem = ({ partner, isActive, onClick }: any) => {
+
     const avatar = useUserAvatar(partner.type === 'people' ? partner.name : null);
-    const lastMsg = useAppSelector((state) => state.lastMessage.messages[partner.name]);
     const currentUsername = useAppSelector((state) => state.auth.user?.username);
 
-    let previewText = partner.type === 'people' ? 'Nhắn tin cá nhân' : 'Phòng cộng đồng';
+    // --- SỬA 1: Đưa Hook lấy unreadCount lên trên cùng, RA KHỎI khối if ---
+    const unreadCount = useAppSelector(state => state.unread.unreadCounts[partner.name] || 0);
+
+    // --- SỬA 2: Tính toán shouldBold ngay tại đây ---
+    // Chỉ đậm khi: Không active VÀ có tin nhắn chưa đọc
+    const shouldBold = !isActive && unreadCount > 0;
+
+    const messagesByTarget = useAppSelector((state) => state.chat.messagesByTarget);
+    const messages = messagesByTarget[partner.name] || [];
+    const lastMsg = messages.length > 0 ? messages[messages.length - 1] : null;
+
+    const timeDisplay = lastMsg?.createAt
+        ? formatTimeAgo(lastMsg.createAt)
+        : formatTimeAgo(partner.actionTime);
+
+
+        console.group(`🕒 Time Debug for: ${partner.name}`);
+        console.log("1. Partner ActionTime (from List API):", partner.actionTime);
+        console.log("2. Messages Loaded count:", messages.length);
+        console.log("3. Last Message Object:", lastMsg);
+        if (lastMsg) {
+            console.log("   -> Last Msg Time:", lastMsg.createAt);
+        }
+        console.log("4. Result Time Display:", lastMsg?.createAt ? formatTimeAgo(lastMsg.createAt) : formatTimeAgo(partner.actionTime));
+        console.groupEnd();
+
+
+    let previewText = partner.type === 'people' ? 'Chưa có tin nhắn' : 'Phòng chưa có tin nhắn';
 
     if (lastMsg) {
-        // Kiểm tra xem tin nhắn có phải là ảnh không
-        const msg = lastMsg.message;
-        const isImage = /\.(jpeg|jpg|gif|png|webp|bmp|svg)$/i.test(msg) ||
-            msg.includes('cloudinary.com') ||
-            msg.startsWith('blob:');
+        const msgContent = lastMsg.mes;
+        const isImage = /\.(jpeg|jpg|gif|png|webp|bmp|svg)$/i.test(msgContent) ||
+            msgContent.includes('cloudinary.com') ||
+            msgContent.startsWith('blob:');
 
         if (isImage) {
-            previewText = '📷 Đã gửi một ảnh';
+            const isMe = lastMsg.name === currentUsername;
+            previewText = isMe ? 'Bạn đã gửi một ảnh' : '📷 Đã gửi một ảnh';
         } else {
-            const isMe = lastMsg.senderName === currentUsername;
-            previewText = (isMe ? 'Bạn: ' : (lastMsg.senderName ? `${lastMsg.senderName}: ` : '')) + msg;
-
-            // Cắt ngắn nếu quá dài (tránh tràn layout)
-            if (previewText.length > 40) {
-                previewText = previewText.substring(0, 37) + '...';
+            const isMe = lastMsg.name === currentUsername;
+            let prefix = '';
+            if (isMe) {
+                prefix = 'Bạn: ';
+            } else if (partner.type === 'room') {
+                prefix = `${lastMsg.name}: `;
             }
-            
+            previewText = prefix + msgContent;
+
+            if (previewText.length > 30) {
+                previewText = previewText.substring(0, 30) + '...';
+            }
             previewText = replaceEmojiShortcodes(previewText);
         }
+        // (Đã xóa đoạn code hooks sai vị trí ở đây)
     }
 
     return (
@@ -97,13 +168,41 @@ const ChatListItem = ({ partner, isActive, onClick }: any) => {
 
             {/* Content Section */}
             <div className="flex-1 min-w-0">
-                <div className="flex justify-between items-baseline mb-0.5">
-                    <p className={`font-bold text-sm truncate ${isActive ? 'text-white' : 'text-gray-900 dark:text-white'}`}>
+                {/* DÒNG 1: TÊN (Trái) -------- [Thời gian + Badge] (Phải) */}
+                <div className="flex justify-between items-center mb-0.5">
+
+                    {/* 1. Tên User (Nằm bên trái) */}
+                    <p className={`text-sm truncate mr-2 ${isActive ? 'text-white' : 'text-gray-900 dark:text-white'} ${shouldBold ? 'font-extrabold' : 'font-bold'}`}>
                         {partner.name}
                     </p>
-                    {isActive && <div className="w-1.5 h-1.5 bg-white rounded-full"></div>}
+
+                    {/* 2. Group bên phải: Gom cả Thời gian và Badge vào đây */}
+                    {/* flex-shrink-0 để đảm bảo cụm này không bị co lại khi tên quá dài */}
+                    <div className="flex items-center gap-2 shrink-0">
+
+                        {/* Thời gian */}
+                        {timeDisplay && (
+                            <span className={`text-[12px] whitespace-nowrap ${isActive ? 'text-blue-100' : (shouldBold ? 'text-blue-600 font-bold' : 'text-gray-400')}`}>
+                                {timeDisplay}
+                            </span>
+                        )}
+
+                        {/* Badge số đỏ hoặc Dot trắng */}
+                        {shouldBold ? (
+                            <span className="bg-red-500 text-white text-[10px] px-1.5 py-0.5 rounded-full min-w-[18px] text-center">
+                                {unreadCount > 9 ? '9+' : unreadCount}
+                            </span>
+                        ) : (
+                            isActive && <div className="w-1.5 h-1.5 bg-white rounded-full"></div>
+                        )}
+                    </div>
                 </div>
-                <p className={`text-xs truncate font-medium ${isActive ? 'text-blue-100' : 'text-gray-500 dark:text-gray-400'}`}>
+
+                {/* DÒNG 2: Preview tin nhắn */}
+                <p className={`text-xs truncate font-medium 
+                    ${isActive ? 'text-blue-100' : 'text-gray-500 dark:text-gray-400'}
+                    ${shouldBold && !isActive ? 'text-gray-900 dark:text-white font-bold' : ''} 
+                `}>
                     {previewText}
                 </p>
             </div>

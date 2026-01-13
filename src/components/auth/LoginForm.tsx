@@ -95,7 +95,7 @@ const LoginForm: React.FC = () => {
             Vui lòng đăng nhập vào tài khoản của bạn
           </p>
 
-          {error && (
+            {error && !error.toLowerCase().includes('re-login') && !error.toLowerCase().includes('overtime') && (
               <div className="mb-5 p-3 bg-red-50 border border-red-200 rounded-lg">
                 <p className="text-sm text-red-600 text-center">{error}</p>
               </div>
