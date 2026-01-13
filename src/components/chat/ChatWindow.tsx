@@ -7,6 +7,8 @@ import { socketService } from '../../services/socketService';
 import { useUserAvatar } from '../../hooks/useUserAvatar';
 import { parseDate } from "../../utils/dateUtils";
 import { setMessages } from '../../store/slices/chatSlice';
+import { useWebRTC } from '../../hooks/useWebRTC';
+import VideoCallModal from './VideoCallModal';
 
 const GROUPING_THRESHOLD_MINUTES = 10;
 const SEPARATOR_THRESHOLD_HOURS = 1;
@@ -24,7 +26,6 @@ export default function ChatWindow() {
     const scrollContainerRef = useRef<HTMLDivElement>(null);
     const scrollHeightRef = useRef<number>(0);
     const lastMessageIdRef = useRef<string | null>(null);
-    // MỚI: Ref cho timer an toàn
     const loadSafetyTimerRef = useRef<NodeJS.Timeout | null>(null);
 
     // --- STATES ---
@@ -33,6 +34,18 @@ export default function ChatWindow() {
     const [isLoadingMore, setIsLoadingMore] = useState(false);
 
     const currentChatAvatar = useUserAvatar(currentChatName || '');
+
+    // --- WEBRTC HOOK ---
+    const {
+        localStream,
+        remoteStream,
+        isCalling,
+        isIncoming,
+        callStatus,
+        startCall,
+        answerCall,
+        endCall
+    } = useWebRTC(currentChatName || '');
 
     // 1. RESET KHI ĐỔI CHAT
     useEffect(() => {
@@ -59,9 +72,7 @@ export default function ChatWindow() {
         }
     }, [currentChatName, currentChatType, isAuthenticated, dispatch]);
 
-    // (Đã xóa useEffect check hết dữ liệu cũ vì nó không hoạt động hiệu quả)
-
-    // 2. XỬ LÝ SCROLL (Load More)
+    // 2. XỬ LÝ SCROLL 
     const handleScroll = (e: React.UIEvent<HTMLDivElement>) => {
         const { scrollTop, scrollHeight } = e.currentTarget;
 
@@ -70,13 +81,12 @@ export default function ChatWindow() {
             scrollHeightRef.current = scrollHeight;
             setIsLoadingMore(true);
 
-            // MỚI: Đặt timer an toàn. Nếu sau 2s mà data chưa về -> coi như hết data.
             if (loadSafetyTimerRef.current) clearTimeout(loadSafetyTimerRef.current);
             loadSafetyTimerRef.current = setTimeout(() => {
                 console.warn("⚠ Load timer expired. Server returned empty or timed out.");
                 setIsLoadingMore(false);
-                setHasMore(false); // Khóa load more
-            }, 2000); // 2 giây
+                setHasMore(false);
+            }, 2000);
 
             const nextPage = page + 1;
             setPage(nextPage);
@@ -91,9 +101,7 @@ export default function ChatWindow() {
 
     // 3. FIX NHẢY LUNG TUNG & TẮT LOADING KHI THÀNH CÔNG
     useLayoutEffect(() => {
-        // Logic này chỉ chạy khi có tin nhắn mới được load vào thành công
         if (isLoadingMore && scrollContainerRef.current) {
-            // MỚI: Load thành công thì hủy timer an toàn đi
             if (loadSafetyTimerRef.current) clearTimeout(loadSafetyTimerRef.current);
 
             const container = scrollContainerRef.current;
@@ -105,17 +113,14 @@ export default function ChatWindow() {
                 container.scrollTop = diff;
             }
 
-            // Tắt trạng thái loading
             setIsLoadingMore(false);
         }
-    }, [messages]); // Chạy khi messages thay đổi
+    }, [messages]);
 
-
-    // 4. AUTO SCROLL BOTTOM (CHỈ KHI CÓ TIN NHẮN MỚI GỬI ĐẾN)
+    // 4. AUTO SCROLL BOTTOM
     useEffect(() => {
         if (messages.length === 0) return;
         const lastMsg = messages[messages.length - 1];
-        // Sử dụng createAt + mes làm key tạm để so sánh nếu không có ID
         const lastMsgId = lastMsg.id || (lastMsg.createAt + lastMsg.mes);
 
         if (lastMsgId !== lastMessageIdRef.current) {
@@ -136,15 +141,14 @@ export default function ChatWindow() {
     }
 
     return (
-        <div className="flex flex-col h-screen bg-white dark:bg-gray-900 w-full border-l border-gray-300 dark:border-gray-700">
-            <ChatHeader/>
+        <div className="flex flex-col h-screen bg-white dark:bg-gray-900 w-full border-l border-gray-300 dark:border-gray-700 relative">
+            <ChatHeader onCallClick={startCall} />
 
             <div
                 ref={scrollContainerRef}
                 onScroll={handleScroll}
                 className="flex-1 overflow-y-auto p-4 flex flex-col space-y-0.5 custom-scrollbar relative"
             >
-                {/* SỬA UI: SPINNER LOADING (Nằm trong luồng, căn giữa chuẩn) */}
                 {isLoadingMore && (
                     <div className="flex justify-center py-2 w-full shrink-0 my-2">
                         <div className="bg-white/80 dark:bg-gray-800/80 p-1.5 rounded-full shadow-sm">
@@ -190,7 +194,7 @@ export default function ChatWindow() {
 
                     return (
                         <MessageItem
-                            key={msg.id || index} // Ưu tiên dùng ID nếu có
+                            key={msg.id || index}
                             msg={msg}
                             isMe={isMe}
                             isFirstInGroup={isFirstInGroup}
@@ -204,6 +208,19 @@ export default function ChatWindow() {
                 <div ref={messagesEndRef}/>
             </div>
             <ChatInput/>
+
+            {/* MODAL VIDEO CALL */}
+            {(isCalling || isIncoming) && (
+                <VideoCallModal
+                    localStream={localStream}
+                    remoteStream={remoteStream}
+                    isIncoming={isIncoming}
+                    onAnswer={answerCall}
+                    onEnd={endCall}
+                    status={callStatus}
+                    partnerName={currentChatName || 'Unknown'}
+                />
+            )}
         </div>
     );
 }

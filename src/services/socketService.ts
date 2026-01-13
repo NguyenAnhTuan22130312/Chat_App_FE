@@ -6,16 +6,18 @@ import {
     socketDisconnected,
     socketConnectionError
 } from "../store/slices/authSlice";
-import {addMessage, ChatMessage, clearMessages, setMessages,addHistoryMessages} from "../store/slices/chatSlice";
+import {addMessage, ChatMessage, clearMessages, setMessages, addHistoryMessages} from "../store/slices/chatSlice";
 import {store} from "../store/store";
 import {ChatPartner, setPartners, updatePartnerOnline} from "../store/slices/chatPartnerSlice";
 import {increaseUnread} from "../store/slices/unreadSlice";
+
 
 const SOCKET_URL = 'wss://chat.longapp.site/chat/chat';
 const HEARTBEAT_INTERVAL = 30000;
 const RECONNECT_DELAY = 3000;
 const MAX_RECONNECT_ATTEMPTS = 5;
 
+type WebRTCSignalCallback = (sender: string, data: any) => void;
 
 const CHAT_WHITELIST = [
     '22130302', 'trunghan', 'anhtuan12', 'hantr', 'long','AnhTuan11','Qte','tuanroomtest','tuantest',
@@ -31,6 +33,32 @@ class SocketService {
     private shouldReconnect: boolean = true;
     private reconnectAttempts: number = 0;
     private checkOnlineQueue: string[] = [];
+    private onWebRTCSignal: WebRTCSignalCallback | null = null;
+
+    public registerWebRTCListener(callback: WebRTCSignalCallback) {
+        this.onWebRTCSignal = callback;
+    }
+
+    public sendWebRTCSignal(toUser: string, data: any) {
+        const signalMessage = JSON.stringify({
+            type: 'WEBRTC_SIGNAL',
+            payload: data
+        });
+        this.sendMessageToPeople(toUser, signalMessage);
+    }
+
+    private isWebRTCSignal(mes: string): any | null {
+        try {
+            if (!mes.startsWith('{')) return null;
+            const parsed = JSON.parse(mes);
+            if (parsed && parsed.type === 'WEBRTC_SIGNAL') {
+                return parsed.payload;
+            }
+        } catch (e) {
+            return null;
+        }
+        return null;
+    }
 
     connect(): Promise<void> {
         if (this.socket && this.socket.readyState === WebSocket.OPEN) {
@@ -85,7 +113,6 @@ class SocketService {
         const {event, status, data: responseData} = payload;
         const IS_STRESS_TEST_MODE = false;
 
-        // Lấy thông tin chat hiện tại từ Redux store để so sánh
         const currentChatState = store.getState().currentChat;
         const myUsername = store.getState().auth.user?.username || localStorage.getItem('username');
 
@@ -115,21 +142,16 @@ class SocketService {
                         const lastMsg = responseData[0];
                         const partnerName = lastMsg.name === myUsername ? lastMsg.to : lastMsg.name;
 
-                        // Chuẩn hóa dữ liệu (Reverse để tin mới nhất ở dưới cùng của mảng trả về)
                         const history = [...responseData].reverse();
 
-                        // --- KIỂM TRA LOGIC LOAD MORE ---
-                        // Lấy state hiện tại từ store để xem đã có tin nhắn chưa
                         const currentMsgs = store.getState().chat.messagesByTarget[partnerName];
 
                         if (!currentMsgs || currentMsgs.length === 0) {
-                            // Trường hợp 1: Chưa có tin nhắn nào (Load lần đầu - Page 1)
                             store.dispatch(setMessages({
                                 target: partnerName,
                                 messages: history
                             }));
                         } else {
-                            // Trường hợp 2: Đã có tin nhắn (Load thêm - Page 2,3...)
                             store.dispatch(addHistoryMessages({
                                 target: partnerName,
                                 messages: history
@@ -137,8 +159,6 @@ class SocketService {
                         }
 
                     } else if (Array.isArray(responseData) && responseData.length === 0) {
-                        // Mảng rỗng: Nếu là lần đầu load thì clear, nếu đang load more thì thôi
-                        // (Logic này giữ nguyên hoặc tùy chỉnh)
                         if (currentChatState.type === 'people' && currentChatState.name) {
                             const currentMsgs = store.getState().chat.messagesByTarget[currentChatState.name];
                             if (!currentMsgs || currentMsgs.length === 0) {
@@ -154,7 +174,6 @@ class SocketService {
                         const chatData = responseData.chatData || [];
                         const history = [...chatData].reverse();
 
-                        // --- KIỂM TRA LOGIC LOAD MORE (Tương tự People) ---
                         const currentMsgs = store.getState().chat.messagesByTarget[roomName];
 
                         if (!currentMsgs || currentMsgs.length === 0) {
@@ -172,17 +191,18 @@ class SocketService {
                     break;
 
                 case 'SEND_CHAT':
-                    console.group("🔥 DEBUG: SEND_CHAT Event");
-                    console.log("1. Raw Data from Server:", responseData);
-
                     if (responseData) {
-                        const rawData = responseData;
+                        const { to, mes, name: senderName, type, createAt } = responseData;
 
-                        const { to, mes, name: senderName, type, createAt } = rawData;
+                        const signalPayload = this.isWebRTCSignal(mes);
+                        if (signalPayload) {
+                            if (this.onWebRTCSignal && senderName !== myUsername) {
+                                this.onWebRTCSignal(senderName, signalPayload);
+                            }
+                            break; 
+                        }
 
                         if (!to || !senderName) {
-                            console.error(" Dữ liệu tin nhắn thiếu 'to' hoặc 'senderName'", rawData);
-                            console.groupEnd();
                             break;
                         }
 
@@ -195,14 +215,7 @@ class SocketService {
                             target = senderName === myUsername ? to : senderName;
                         }
 
-                        console.log(`2. Logic Check:`);
-                        console.log(`   - My Username: ${myUsername}`);
-                        console.log(`   - Sender: ${senderName}`);
-                        console.log(`   - To: ${to}`);
-                        console.log(`   => CALCULATED TARGET: "${target}"`);
-
                         const newMessage: ChatMessage = {
-
                             name: senderName,
                             to: to,
                             mes: mes,
@@ -210,7 +223,6 @@ class SocketService {
                             createAt: createAt || new Date().toISOString()
                         };
 
-                        console.log("3. Dispatching addMessage action...");
                         store.dispatch(addMessage({
                             target: target,
                             message: newMessage
@@ -219,8 +231,6 @@ class SocketService {
                         const state = store.getState();
                         const currentChat = state.currentChat;
 
-                        // Nếu tin nhắn KHÔNG PHẢI do mình gửi
-                        // VÀ (mình đang không mở chat HOẶC đang mở chat với người khác)
                         const isMyMessage = senderName === myUsername;
 
                         if (!isMyMessage) {
@@ -229,16 +239,10 @@ class SocketService {
                             }
                         }
                     }
-                    console.groupEnd();
-
-
                     break;
 
                 case 'GET_USER_LIST':
-                    // console.group("🔍 DEBUG GET_USER_LIST");
-
                     if (Array.isArray(responseData)) {
-                        // 1. Map dữ liệu thô sang format chuẩn
                         let allPartners: ChatPartner[] = responseData.map((item: any) => ({
                             name: item.name,
                             type: (item.type === 1 ? 'room' : 'people') as 'room' | 'people',
@@ -246,43 +250,29 @@ class SocketService {
                             isOnline: false,
                         }));
 
-                        // 2. XỬ LÝ LỌC (Logic Key Test Tải)
                         let partnersToProcess: ChatPartner[] = [];
 
                         if (IS_STRESS_TEST_MODE) {
-                            // [TEST MODE] Lấy tất cả, không lọc gì cả
-                            console.warn(`⚠️ ĐANG CHẠY CHẾ ĐỘ STRESS TEST: Load toàn bộ ${allPartners.length} users!`);
                             partnersToProcess = allPartners;
                         } else {
-                            // [NORMAL MODE] Chỉ giữ lại whitelist
                             partnersToProcess = allPartners.filter(p => CHAT_WHITELIST.includes(p.name));
                         }
 
-                        // 3. Sắp xếp (Áp dụng cho danh sách đã chọn)
                         partnersToProcess.sort((a, b) => {
                             if (!a.actionTime || !b.actionTime) return 0;
-                            // Note: Dòng console.log cũ của bạn nằm sau return nên ko chạy đâu nhé, mình bỏ đi cho gọn
                             return new Date(b.actionTime).getTime() - new Date(a.actionTime).getTime();
                         });
 
-                        // 4. DISPATCH
                         store.dispatch(setPartners(partnersToProcess));
 
                         this.checkOnlineQueue = [];
 
-                        // 5. Chạy vòng lặp lấy dữ liệu chi tiết
-                        // Lưu ý: Nếu list quá dài (vd: 1000 user), việc set timeout này sẽ kéo dài rất lâu
                         partnersToProcess.forEach((partner, index) => {
-                            // Nếu test tải, có thể giảm delay xuống (vd: 50ms) để spam nhanh hơn,
-                            // hoặc giữ 300ms để giả lập hành vi người dùng thật.
                             const delayTime = IS_STRESS_TEST_MODE ? 100 : 300;
 
                             setTimeout(() => {
                                 if (partner.type === 'people') {
-                                    // A. Ghi tên vào hàng đợi
                                     this.checkOnlineQueue.push(partner.name);
-
-                                    // B. Gửi câu hỏi lên Server
                                     this.checkUserOnline(partner.name);
                                     this.getHistory(partner.name);
                                 } else if (partner.type === 'room') {
@@ -298,7 +288,6 @@ class SocketService {
                     break;
 
                 case 'CHECK_USER_ONLINE':
-
                     if (responseData) {
                         const isOnline = responseData.status;
                         const targetUser = this.checkOnlineQueue.shift();
@@ -380,7 +369,6 @@ class SocketService {
         this.send({event: 'SEND_CHAT', data: {type: 'people', to: toUser, mes: message}});
     }
 
-// Hàm gọi API có page (Bạn đã có, mình chỉ viết lại cho chắc)
     public getHistory(partnerName: string, page: number = 1) {
         console.log(`📡 Requesting history for ${partnerName} - Page: ${page}`);
         this.send({event: 'GET_PEOPLE_CHAT_MES', data: {name: partnerName, page}});

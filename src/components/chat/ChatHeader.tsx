@@ -1,7 +1,10 @@
 import React, { useMemo } from 'react';
 import { useAppSelector } from '../../hooks/reduxHooks';
+interface ChatHeaderProps {
+    onCallClick?: () => void;
+}
 
-export default function ChatHeader() {
+export default function ChatHeader({ onCallClick }: ChatHeaderProps) {
     const { name, type } = useAppSelector((state) => state.currentChat);
     const { partners } = useAppSelector((state) => state.chatPartner);
 
@@ -10,21 +13,19 @@ export default function ChatHeader() {
         return partners.find(p => p.name === name);
     }, [partners, name]);
 
-    // Logic hiển thị Trạng thái và Màu sắc chấm tròn
     let statusText = '';
     let dotColor = '';
 
     if (type === 'room') {
         statusText = 'Nhóm và Cộng đồng';
-        dotColor = 'bg-orange-500'; // Màu cam cho nhóm
+        dotColor = 'bg-orange-500'; 
     } else {
-        // Nếu là người (people)
         if (currentPartner?.isOnline) {
             statusText = 'Đang hoạt động';
-            dotColor = 'bg-green-500'; // Màu xanh lá cho Online
+            dotColor = 'bg-green-500'; 
         } else {
             statusText = 'Không hoạt động';
-            dotColor = 'bg-gray-400'; // Màu xám cho Offline
+            dotColor = 'bg-gray-400'; 
         }
     }
 
@@ -51,7 +52,7 @@ export default function ChatHeader() {
             {/* Các nút chức năng bên phải (Call, Video Call...) */}
             <div className="absolute right-4 flex space-x-3 text-[#0084ff] dark:text-blue-400">
                 {/* Icon Gọi điện */}
-                <button className="p-2 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-full transition-colors">
+                <button onClick={onCallClick} className="p-2 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-full transition-colors">
                     <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z"></path></svg>
                 </button>
 
