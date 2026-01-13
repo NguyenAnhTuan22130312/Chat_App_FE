@@ -27,10 +27,14 @@ export default function ChatInput() {
     const tempMessage = {
       name: user?.username || 'me',
       mes: content,
+        type: currentType,
       to: currentName,
       createAt: new Date().toISOString()
     };
-    dispatch(addMessage(tempMessage));
+    dispatch(addMessage({
+        target: currentName,
+        message: tempMessage
+    }));
 
     try {
       await socketService.connect();

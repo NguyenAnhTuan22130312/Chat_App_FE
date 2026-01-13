@@ -3,7 +3,7 @@ import authReducer from './slices/authSlice';
 import chatPartnerReducer from './slices/chatPartnerSlice';
 import chatReducer from './slices/chatSlice';
 import currentChatReducer from './slices/currentChatSlice'
-import lastMessageReducer from './slices/lastMessageSlice';
+// import lastMessageReducer from './slices/lastMessageSlice';
 import unreadReducer from './slices/unreadSlice';
 import themeReducer from './slices/themeSlice';
 
@@ -13,7 +13,7 @@ export const store = configureStore({
         chat: chatReducer,
         chatPartner: chatPartnerReducer,
         currentChat: currentChatReducer,
-        lastMessage: lastMessageReducer,
+        // lastMessage: lastMessageReducer,
         unread: unreadReducer,
         theme: themeReducer,
     },
