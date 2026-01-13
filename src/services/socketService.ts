@@ -6,7 +6,7 @@ import {
     socketDisconnected,
     socketConnectionError
 } from "../store/slices/authSlice";
-import {addMessage, ChatMessage, clearMessages, setMessages} from "../store/slices/chatSlice";
+import {addMessage, ChatMessage, clearMessages, setMessages,addHistoryMessages} from "../store/slices/chatSlice";
 import {store} from "../store/store";
 import {ChatPartner, setPartners, updatePartnerOnline} from "../store/slices/chatPartnerSlice";
 import {increaseUnread} from "../store/slices/unreadSlice";
@@ -111,50 +111,63 @@ class SocketService {
                     break;
 
                 case 'GET_PEOPLE_CHAT_MES':
-                    // Case này hơi khó vì nếu mảng rỗng thì không biết ai là partner để set
                     if (Array.isArray(responseData) && responseData.length > 0) {
                         const lastMsg = responseData[0];
-
-                        // Logic xác định mình đang chat với ai
                         const partnerName = lastMsg.name === myUsername ? lastMsg.to : lastMsg.name;
 
-                        // 1. Chuẩn hóa dữ liệu (Reverse để tin mới nhất ở dưới cùng)
+                        // Chuẩn hóa dữ liệu (Reverse để tin mới nhất ở dưới cùng của mảng trả về)
                         const history = [...responseData].reverse();
 
-                        // 2. Dispatch vào Slice Mới
-                        // LƯU Ý: Không cần check currentChatState.name === partnerName
-                        // Cứ lưu vào store, dù user có đang xem hay không.
-                        store.dispatch(setMessages({
-                            target: partnerName,
-                            messages: history
-                        }));
+                        // --- KIỂM TRA LOGIC LOAD MORE ---
+                        // Lấy state hiện tại từ store để xem đã có tin nhắn chưa
+                        const currentMsgs = store.getState().chat.messagesByTarget[partnerName];
+
+                        if (!currentMsgs || currentMsgs.length === 0) {
+                            // Trường hợp 1: Chưa có tin nhắn nào (Load lần đầu - Page 1)
+                            store.dispatch(setMessages({
+                                target: partnerName,
+                                messages: history
+                            }));
+                        } else {
+                            // Trường hợp 2: Đã có tin nhắn (Load thêm - Page 2,3...)
+                            store.dispatch(addHistoryMessages({
+                                target: partnerName,
+                                messages: history
+                            }));
+                        }
 
                     } else if (Array.isArray(responseData) && responseData.length === 0) {
-                        // Nếu mảng rỗng, ta chỉ có thể clear nếu đang mở đúng chat đó
-                        // (Do API không trả về tên người khi mảng rỗng)
+                        // Mảng rỗng: Nếu là lần đầu load thì clear, nếu đang load more thì thôi
+                        // (Logic này giữ nguyên hoặc tùy chỉnh)
                         if (currentChatState.type === 'people' && currentChatState.name) {
-                            store.dispatch(setMessages({
-                                target: currentChatState.name,
-                                messages: []
-                            }));
+                            const currentMsgs = store.getState().chat.messagesByTarget[currentChatState.name];
+                            if (!currentMsgs || currentMsgs.length === 0) {
+                                store.dispatch(setMessages({ target: currentChatState.name, messages: [] }));
+                            }
                         }
                     }
                     break;
 
                 case 'GET_ROOM_CHAT_MES':
-                    if (responseData && responseData.name) { // Check kỹ hơn chút
+                    if (responseData && responseData.name) {
                         const roomName = responseData.name;
-                        const chatData = responseData.chatData || []; // Fallback nếu null
-
-                        // 1. Chuẩn hóa dữ liệu
+                        const chatData = responseData.chatData || [];
                         const history = [...chatData].reverse();
 
-                        // 2. Dispatch vào Slice Mới
-                        // Tương tự, lưu luôn vào store theo target là tên phòng
-                        store.dispatch(setMessages({
-                            target: roomName,
-                            messages: history
-                        }));
+                        // --- KIỂM TRA LOGIC LOAD MORE (Tương tự People) ---
+                        const currentMsgs = store.getState().chat.messagesByTarget[roomName];
+
+                        if (!currentMsgs || currentMsgs.length === 0) {
+                            store.dispatch(setMessages({
+                                target: roomName,
+                                messages: history
+                            }));
+                        } else {
+                            store.dispatch(addHistoryMessages({
+                                target: roomName,
+                                messages: history
+                            }));
+                        }
                     }
                     break;
 
@@ -367,11 +380,13 @@ class SocketService {
         this.send({event: 'SEND_CHAT', data: {type: 'people', to: toUser, mes: message}});
     }
 
-    getHistory(partnerName: string) {
-        this.send({event: 'GET_PEOPLE_CHAT_MES', data: {name: partnerName, page: 1}});
+// Hàm gọi API có page (Bạn đã có, mình chỉ viết lại cho chắc)
+    public getHistory(partnerName: string, page: number = 1) {
+        console.log(`📡 Requesting history for ${partnerName} - Page: ${page}`);
+        this.send({event: 'GET_PEOPLE_CHAT_MES', data: {name: partnerName, page}});
     }
 
-    getRoomHistory(roomName: string, page: number = 1) {
+    public getRoomHistory(roomName: string, page: number = 1) {
         this.send({event: 'GET_ROOM_CHAT_MES', data: {name: roomName, page}});
     }
 

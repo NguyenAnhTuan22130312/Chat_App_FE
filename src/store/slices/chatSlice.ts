@@ -11,7 +11,7 @@ export interface ChatMessage {
     to?: string;
     mes: string;
     createAt?: string;
-
+    id?: string;
 }
 
 interface ChatState {
@@ -31,6 +31,28 @@ const chatSlice = createSlice({
             action: PayloadAction<{ target: string; messages: ChatMessage[] }>
         ) => {
             state.messagesByTarget[action.payload.target] = action.payload.messages;
+        },
+        // --- ACTION MỚI: Dùng cho load more (Phân trang) ---
+        addHistoryMessages: (
+            state,
+            action: PayloadAction<{ target: string; messages: ChatMessage[] }>
+        ) => {
+            const { target, messages: incomingMessages } = action.payload;
+            const currentMessages = state.messagesByTarget[target] || [];
+
+            if (incomingMessages.length === 0) return;
+
+            // 1. Lọc trùng lặp (Dùng createAt + mes làm key tạm nếu ko có id)
+            // Set chứa các tin nhắn hiện tại để check
+            const existingKeys = new Set(currentMessages.map(m => m.createAt + '_' + m.mes));
+
+            // Chỉ lấy những tin nhắn chưa tồn tại
+            const uniqueIncoming = incomingMessages.filter(m => !existingKeys.has(m.createAt + '_' + m.mes));
+
+            // 2. Gộp: [Tin Cũ Vừa Load] + [Tin Hiện Tại]
+            state.messagesByTarget[target] = [...uniqueIncoming, ...currentMessages];
+
+            console.log(`📜 Loaded history for ${target}: added ${uniqueIncoming.length} msgs`);
         },
 
         addMessage: (
@@ -53,5 +75,5 @@ const chatSlice = createSlice({
     },
 });
 
-export const {setMessages, addMessage, clearMessages} = chatSlice.actions;
+export const {setMessages, addMessage, clearMessages,addHistoryMessages} = chatSlice.actions;
 export default chatSlice.reducer;
