@@ -8,9 +8,10 @@ interface MessageBubbleProps {
     avatar?: string;
     timestamp?: string;
     hasAvatarPlaceholder?: boolean;
+    senderName?: string;
 }
 
-const MessageBubble = ({text, isMe, avatar,timestamp,hasAvatarPlaceholder}: MessageBubbleProps) => {
+const MessageBubble = ({text, isMe, avatar,timestamp,hasAvatarPlaceholder,senderName}: MessageBubbleProps) => {
     const isImageUrl = (url: string) => {
         if (!url) return false;
         const hasImageExtension = /\.(jpeg|jpg|gif|png|webp|bmp)$/i.test(url);
@@ -92,6 +93,12 @@ const MessageBubble = ({text, isMe, avatar,timestamp,hasAvatarPlaceholder}: Mess
 
             {/* --- BONG BÓNG CHAT --- */}
             <div className={`flex flex-col max-w-[70%] ${isMe ? 'items-end' : 'items-start'}`}>
+                {/* --- MỚI: HIỂN THỊ TÊN NGƯỜI GỬI TRONG GROUP --- */}
+                {senderName && (
+                    <span className="text-[11px] text-gray-500 dark:text-gray-400 ml-1 mb-1 font-medium select-none">
+                        {senderName}
+                    </span>
+                )}
                 <div
                     className={`
                         relative text-[15px] leading-relaxed break-words overflow-hidden

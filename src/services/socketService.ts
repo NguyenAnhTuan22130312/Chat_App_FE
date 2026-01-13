@@ -18,7 +18,8 @@ const MAX_RECONNECT_ATTEMPTS = 5;
 
 
 const CHAT_WHITELIST = [
-    '22130302', 'trunghan', 'anhtuan12', 'hantr', 'long'
+    '22130302', 'trunghan', 'anhtuan12', 'hantr', 'long','AnhTuan11','Qte','tuanroomtest','tuantest',
+    '22130312_anhtuan', '22130302_hantrung', '22130311_NguyenAnhTuan', 'Nhom_63'
 ];
 
 class SocketService {
@@ -82,6 +83,7 @@ class SocketService {
     private handleServerResponse(receivedData: any) {
         const payload = receivedData.action === 'onchat' ? receivedData.data : receivedData;
         const {event, status, data: responseData} = payload;
+        const IS_STRESS_TEST_MODE = false;
 
         // Lấy thông tin chat hiện tại từ Redux store để so sánh
         const currentChatState = store.getState().currentChat;
@@ -220,10 +222,7 @@ class SocketService {
                     break;
 
                 case 'GET_USER_LIST':
-
                     // console.group("🔍 DEBUG GET_USER_LIST");
-                    // console.log("1. Raw Response Data:", responseData);
-                    // console.log("2. Total count from Server:", Array.isArray(responseData) ? responseData.length : 'Not Array');
 
                     if (Array.isArray(responseData)) {
                         // 1. Map dữ liệu thô sang format chuẩn
@@ -234,28 +233,40 @@ class SocketService {
                             isOnline: false,
                         }));
 
+                        // 2. XỬ LÝ LỌC (Logic Key Test Tải)
+                        let partnersToProcess: ChatPartner[] = [];
 
-                        // 2. LỌC NGAY TẠI ĐÂY (Logic Whitelist)
-                        // Chỉ giữ lại những người có tên trong CHAT_WHITELIST
-                        const whitelistedPartners = allPartners.filter(p => CHAT_WHITELIST.includes(p.name));
+                        if (IS_STRESS_TEST_MODE) {
+                            // [TEST MODE] Lấy tất cả, không lọc gì cả
+                            console.warn(`⚠️ ĐANG CHẠY CHẾ ĐỘ STRESS TEST: Load toàn bộ ${allPartners.length} users!`);
+                            partnersToProcess = allPartners;
+                        } else {
+                            // [NORMAL MODE] Chỉ giữ lại whitelist
+                            partnersToProcess = allPartners.filter(p => CHAT_WHITELIST.includes(p.name));
+                        }
 
-                        // 3. Sắp xếp (nếu cần)
-                        whitelistedPartners.sort((a, b) => {
+                        // 3. Sắp xếp (Áp dụng cho danh sách đã chọn)
+                        partnersToProcess.sort((a, b) => {
                             if (!a.actionTime || !b.actionTime) return 0;
+                            // Note: Dòng console.log cũ của bạn nằm sau return nên ko chạy đâu nhé, mình bỏ đi cho gọn
                             return new Date(b.actionTime).getTime() - new Date(a.actionTime).getTime();
-                            console.log(a.actionTime,b.actionTime);
                         });
 
-                        // 4. DISPATCH (Lúc này trong Slice chỉ có những người trong Whitelist)
-                        store.dispatch(setPartners(whitelistedPartners));
+                        // 4. DISPATCH
+                        store.dispatch(setPartners(partnersToProcess));
 
                         this.checkOnlineQueue = [];
 
-                        // 5. Chạy vòng lặp lấy dữ liệu chi tiết (Dùng chính list đã lọc để chạy)
-                        whitelistedPartners.forEach((partner, index) => {
+                        // 5. Chạy vòng lặp lấy dữ liệu chi tiết
+                        // Lưu ý: Nếu list quá dài (vd: 1000 user), việc set timeout này sẽ kéo dài rất lâu
+                        partnersToProcess.forEach((partner, index) => {
+                            // Nếu test tải, có thể giảm delay xuống (vd: 50ms) để spam nhanh hơn,
+                            // hoặc giữ 300ms để giả lập hành vi người dùng thật.
+                            const delayTime = IS_STRESS_TEST_MODE ? 100 : 300;
+
                             setTimeout(() => {
                                 if (partner.type === 'people') {
-                                    // A. Ghi tên vào hàng đợi (Xếp hàng)
+                                    // A. Ghi tên vào hàng đợi
                                     this.checkOnlineQueue.push(partner.name);
 
                                     // B. Gửi câu hỏi lên Server
@@ -264,11 +275,10 @@ class SocketService {
                                 } else if (partner.type === 'room') {
                                     this.getRoomHistory(partner.name, 1);
                                 }
-                            }, index * 300);
+                            }, index * delayTime);
                         });
                     }
                     break;
-
                 case 'CREATE_ROOM':
                 case 'JOIN_ROOM':
                     this.getUserList();
