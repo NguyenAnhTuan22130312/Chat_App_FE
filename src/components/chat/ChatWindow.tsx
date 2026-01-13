@@ -1,73 +1,162 @@
-import React, {useEffect, useRef} from 'react';
+import React, { useEffect, useRef, useState, useLayoutEffect } from 'react';
 import ChatHeader from './ChatHeader';
-import MessageBubble from './MessageBubble';
+import MessageItem from './MessageItem';
 import ChatInput from './ChatInput';
-import {useAppSelector} from '../../hooks/reduxHooks';
-import {socketService} from '../../services/socketService';
-import {useUserAvatar} from '../../hooks/useUserAvatar';
+import { useAppSelector, useAppDispatch } from '../../hooks/reduxHooks';
+import { socketService } from '../../services/socketService';
+import { useUserAvatar } from '../../hooks/useUserAvatar';
+import { parseDate } from "../../utils/dateUtils";
+import { setMessages } from '../../store/slices/chatSlice';
 
-const formatMessageTime = (dateString?: string) => {
-    if (!dateString) return '';
-
-    // Fix lỗi múi giờ server trả về thiếu 'Z'
-    let isoTime = dateString;
-    if (!isoTime.endsWith('Z')) {
-        isoTime = isoTime + 'Z';
-    }
-
-    const date = new Date(isoTime);
-    // Lấy giờ và phút, thêm số 0 ở đầu nếu < 10 (ví dụ 9:5 -> 09:05)
-    const hours = date.getHours().toString().padStart(2, '0');
-    const minutes = date.getMinutes().toString().padStart(2, '0');
-
-    return `${hours}:${minutes}`;
-};
+const GROUPING_THRESHOLD_MINUTES = 10;
+const SEPARATOR_THRESHOLD_HOURS = 1;
 
 export default function ChatWindow() {
-    const {user, isAuthenticated} = useAppSelector((state) => state.auth);
+    const dispatch = useAppDispatch();
+    const { user, isAuthenticated } = useAppSelector((state) => state.auth);
     const myUsername = user?.username;
     const messagesByTarget = useAppSelector((state) => state.chat.messagesByTarget);
-    const {name: currentChatName, type: currentChatType} = useAppSelector((state) => state.currentChat);
+    const { name: currentChatName, type: currentChatType } = useAppSelector((state) => state.currentChat);
     const messages = currentChatName ? (messagesByTarget[currentChatName] || []) : [];
-    const messagesEndRef = useRef<HTMLDivElement>(null);
-    const partnerAvatar = useUserAvatar(currentChatName || '');
 
-    // Effect: Gọi API lấy lịch sử khi thay đổi chat
+    // --- REFS ---
+    const messagesEndRef = useRef<HTMLDivElement>(null);
+    const scrollContainerRef = useRef<HTMLDivElement>(null);
+    const scrollHeightRef = useRef<number>(0);
+    const lastMessageIdRef = useRef<string | null>(null);
+    // MỚI: Ref cho timer an toàn
+    const loadSafetyTimerRef = useRef<NodeJS.Timeout | null>(null);
+
+    // --- STATES ---
+    const [page, setPage] = useState(1);
+    const [hasMore, setHasMore] = useState(true);
+    const [isLoadingMore, setIsLoadingMore] = useState(false);
+
+    const currentChatAvatar = useUserAvatar(currentChatName || '');
+
+    // 1. RESET KHI ĐỔI CHAT
     useEffect(() => {
         if (isAuthenticated && currentChatName && currentChatType) {
-            // Delay nhẹ để đảm bảo socket sẵn sàng hoặc UI ổn định
+            setPage(1);
+            setHasMore(true);
+            setIsLoadingMore(false);
+            scrollHeightRef.current = 0;
+            lastMessageIdRef.current = null;
+            if (loadSafetyTimerRef.current) clearTimeout(loadSafetyTimerRef.current);
+
+            dispatch(setMessages({ target: currentChatName, messages: [] }));
+
             const timer = setTimeout(() => {
                 if (currentChatType === 'room') {
-                    socketService.getRoomHistory(currentChatName);
+                    socketService.getRoomHistory(currentChatName || '', 1);
                 } else {
-                    socketService.getHistory(currentChatName);
+                    socketService.getHistory(currentChatName || '', 1);
                 }
-            }, 100);
-            return () => clearTimeout(timer);
+            }, 50);
+            return () => {
+                clearTimeout(timer);
+            };
         }
-    }, [currentChatName, currentChatType, isAuthenticated]);
+    }, [currentChatName, currentChatType, isAuthenticated, dispatch]);
+
+    // (Đã xóa useEffect check hết dữ liệu cũ vì nó không hoạt động hiệu quả)
+
+    // 2. XỬ LÝ SCROLL (Load More)
+    const handleScroll = (e: React.UIEvent<HTMLDivElement>) => {
+        const { scrollTop, scrollHeight } = e.currentTarget;
+
+        if (scrollTop === 0 && hasMore && !isLoadingMore && messages.length > 0) {
+            console.log(` Requesting Page ${page + 1}...`);
+            scrollHeightRef.current = scrollHeight;
+            setIsLoadingMore(true);
+
+            // MỚI: Đặt timer an toàn. Nếu sau 2s mà data chưa về -> coi như hết data.
+            if (loadSafetyTimerRef.current) clearTimeout(loadSafetyTimerRef.current);
+            loadSafetyTimerRef.current = setTimeout(() => {
+                console.warn("⚠ Load timer expired. Server returned empty or timed out.");
+                setIsLoadingMore(false);
+                setHasMore(false); // Khóa load more
+            }, 2000); // 2 giây
+
+            const nextPage = page + 1;
+            setPage(nextPage);
+
+            if (currentChatType === 'room') {
+                socketService.getRoomHistory(currentChatName || '', nextPage);
+            } else {
+                socketService.getHistory(currentChatName || '', nextPage);
+            }
+        }
+    };
+
+    // 3. FIX NHẢY LUNG TUNG & TẮT LOADING KHI THÀNH CÔNG
+    useLayoutEffect(() => {
+        // Logic này chỉ chạy khi có tin nhắn mới được load vào thành công
+        if (isLoadingMore && scrollContainerRef.current) {
+            // MỚI: Load thành công thì hủy timer an toàn đi
+            if (loadSafetyTimerRef.current) clearTimeout(loadSafetyTimerRef.current);
+
+            const container = scrollContainerRef.current;
+            const newScrollHeight = container.scrollHeight;
+            const diff = newScrollHeight - scrollHeightRef.current;
+
+            if (diff > 0) {
+                console.log(` Restoring scroll: pushed down ${diff}px`);
+                container.scrollTop = diff;
+            }
+
+            // Tắt trạng thái loading
+            setIsLoadingMore(false);
+        }
+    }, [messages]); // Chạy khi messages thay đổi
 
 
-    // Effect: Scroll xuống cuối khi có tin nhắn mới
+    // 4. AUTO SCROLL BOTTOM (CHỈ KHI CÓ TIN NHẮN MỚI GỬI ĐẾN)
     useEffect(() => {
-        messagesEndRef.current?.scrollIntoView({behavior: 'smooth'});
-    }, [messages]);
+        if (messages.length === 0) return;
+        const lastMsg = messages[messages.length - 1];
+        // Sử dụng createAt + mes làm key tạm để so sánh nếu không có ID
+        const lastMsgId = lastMsg.id || (lastMsg.createAt + lastMsg.mes);
+
+        if (lastMsgId !== lastMessageIdRef.current) {
+            if (!isLoadingMore) {
+                messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+            }
+            lastMessageIdRef.current = lastMsgId;
+        }
+    }, [messages, isLoadingMore]);
+
 
     if (!currentChatName) {
         return (
-            <div
-                className="flex flex-col h-screen bg-white dark:bg-gray-900 w-full border-l border-gray-300 dark:border-gray-700 items-center justify-center text-gray-400 dark:text-gray-500">
+            <div className="flex flex-col h-screen bg-white dark:bg-gray-900 w-full border-l border-gray-300 dark:border-gray-700 items-center justify-center text-gray-400 dark:text-gray-500">
                 Chọn một cuộc hội thoại để bắt đầu
             </div>
         );
     }
 
     return (
-        <div
-            className="flex flex-col h-screen bg-white dark:bg-gray-900 w-full border-l border-gray-300 dark:border-gray-700">
+        <div className="flex flex-col h-screen bg-white dark:bg-gray-900 w-full border-l border-gray-300 dark:border-gray-700">
             <ChatHeader/>
-            <div className="flex-1 overflow-y-auto p-4 flex flex-col space-y-0.5">
-                {messages.length === 0 && (
+
+            <div
+                ref={scrollContainerRef}
+                onScroll={handleScroll}
+                className="flex-1 overflow-y-auto p-4 flex flex-col space-y-0.5 custom-scrollbar relative"
+            >
+                {/* SỬA UI: SPINNER LOADING (Nằm trong luồng, căn giữa chuẩn) */}
+                {isLoadingMore && (
+                    <div className="flex justify-center py-2 w-full shrink-0 my-2">
+                        <div className="bg-white/80 dark:bg-gray-800/80 p-1.5 rounded-full shadow-sm">
+                            <svg className="animate-spin h-5 w-5 text-blue-500" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                                <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                                <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                            </svg>
+                        </div>
+                    </div>
+                )}
+
+                {messages.length === 0 && !isLoadingMore && (
                     <div className="text-center text-gray-400 dark:text-gray-500 mt-10">
                         Bắt đầu cuộc trò chuyện với {currentChatName}...
                     </div>
@@ -75,33 +164,40 @@ export default function ChatWindow() {
 
                 {messages.map((msg, index) => {
                     const isMe = msg.name === myUsername;
-
-                    // --- SỬA LOGIC TẠI ĐÂY ---
-
-                    // 1. Logic Avatar: Kiểm tra xem đây có phải là tin ĐẦU TIÊN của nhóm không?
-                    // (Là tin đầu nếu: Không có tin trước đó HOẶC tin trước đó là của người khác)
                     const prevMsg = messages[index - 1];
-                    const isFirstInGroup = !prevMsg || prevMsg.name !== msg.name;
-
-                    // 2. Logic Timestamp: Kiểm tra xem đây có phải là tin CUỐI CÙNG của nhóm không?
-                    // (Là tin cuối nếu: Không có tin tiếp theo HOẶC tin tiếp theo là của người khác)
                     const nextMsg = messages[index + 1];
-                    const isLastInGroup = !nextMsg || nextMsg.name !== msg.name;
+
+                    const currentTime = parseDate(msg.createAt).getTime();
+                    const prevTime = prevMsg ? parseDate(prevMsg.createAt).getTime() : 0;
+                    const nextTime = nextMsg ? parseDate(nextMsg.createAt).getTime() : 0;
+
+                    const diffFromPrevMinutes = prevMsg ? (currentTime - prevTime) / (1000 * 60) : 0;
+                    const diffToNextMinutes = nextMsg ? (nextTime - currentTime) / (1000 * 60) : 0;
+
+                    let showTimeSeparator = false;
+                    if (!prevMsg || diffFromPrevMinutes >= SEPARATOR_THRESHOLD_HOURS * 60) {
+                        showTimeSeparator = true;
+                    }
+
+                    const isFirstInGroup = !prevMsg ||
+                        prevMsg.name !== msg.name ||
+                        showTimeSeparator ||
+                        diffFromPrevMinutes > GROUPING_THRESHOLD_MINUTES;
+
+                    const isLastInGroup = !nextMsg ||
+                        nextMsg.name !== msg.name ||
+                        diffToNextMinutes > GROUPING_THRESHOLD_MINUTES;
 
                     return (
-                        <MessageBubble
-                            key={index}
-                            text={msg.mes}
+                        <MessageItem
+                            key={msg.id || index} // Ưu tiên dùng ID nếu có
+                            msg={msg}
                             isMe={isMe}
-
-                            // 3. Avatar chỉ truyền khi: Không phải tôi VÀ Là tin đầu nhóm
-                            avatar={(!isMe && isFirstInGroup) ? partnerAvatar : undefined}
-
-                            // 4. Placeholder (để thẳng hàng): Không phải tôi VÀ KHÔNG phải tin đầu nhóm
-                            hasAvatarPlaceholder={!isMe && !isFirstInGroup}
-
-                            // 5. Timestamp chỉ truyền khi: Là tin cuối nhóm
-                            timestamp={isLastInGroup ? formatMessageTime(msg.createAt) : undefined}
+                            isFirstInGroup={isFirstInGroup}
+                            isLastInGroup={isLastInGroup}
+                            showTimeSeparator={showTimeSeparator}
+                            chatType={currentChatType}
+                            partnerAvatarFallback={currentChatAvatar}
                         />
                     );
                 })}

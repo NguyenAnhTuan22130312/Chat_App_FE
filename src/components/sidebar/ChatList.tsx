@@ -3,11 +3,34 @@ import { setCurrentChat } from '../../store/slices/currentChatSlice';
 import { useUserAvatar } from '../../hooks/useUserAvatar';
 import { useMemo } from 'react';
 import { replaceEmojiShortcodes } from '../../utils/emojiShortcodes';
-import {clearUnread} from "../../store/slices/unreadSlice";
+import { clearUnread } from "../../store/slices/unreadSlice";
+import { formatSeparatorTime } from '../../utils/dateUtils'; // Nếu bạn đã tách file utils thì dùng, ko thì dùng hàm dưới
 
 interface ChatListProps {
     searchQuery: string;
 }
+
+// Hàm tính khoảng cách thời gian (Giữ nguyên logic của bạn)
+const formatTimeAgo = (dateString?: string) => {
+    if (!dateString) return '';
+
+    let isoTime = dateString;
+    if (!isoTime.endsWith('Z')) {
+        isoTime = isoTime + 'Z';
+    }
+
+    const date = new Date(isoTime);
+    const now = new Date();
+    const diffInSeconds = Math.floor((now.getTime() - date.getTime()) / 1000);
+
+    if (diffInSeconds < 0) return 'Vừa xong';
+    if (diffInSeconds < 60) return 'Vừa xong';
+    if (diffInSeconds < 3600) return `${Math.floor(diffInSeconds / 60)} phút`;
+    if (diffInSeconds < 86400) return `${Math.floor(diffInSeconds / 3600)} giờ`;
+    if (diffInSeconds < 604800) return `${Math.floor(diffInSeconds / 86400)} ngày`;
+
+    return `${date.getDate()}/${date.getMonth() + 1}`;
+};
 
 const ChatList = ({ searchQuery }: ChatListProps) => {
     const dispatch = useAppDispatch();
@@ -20,8 +43,6 @@ const ChatList = ({ searchQuery }: ChatListProps) => {
             .filter(p => p.name.toLowerCase().includes(searchQuery.toLowerCase()) && p.name !== currentUsername)
             .sort((a, b) => (b.actionTime || 0) > (a.actionTime || 0) ? 1 : -1);
     }, [partners, searchQuery, currentUsername]);
-
-    
 
     return (
         <div className="flex-1 overflow-y-auto px-2 space-y-1 custom-scrollbar">
@@ -38,7 +59,6 @@ const ChatList = ({ searchQuery }: ChatListProps) => {
                         isActive={currentChat.name === partner.name}
                         onClick={() => {
                             dispatch(setCurrentChat({ name: partner.name, type: partner.type }));
-
                             dispatch(clearUnread(partner.name));
                         }}
                     />
@@ -48,50 +68,10 @@ const ChatList = ({ searchQuery }: ChatListProps) => {
     );
 };
 
-// Hàm tính khoảng cách thời gian
-const formatTimeAgo = (dateString?: string) => {
-    if (!dateString) return '';
-
-    // --- LOGIC FIX MÚI GIỜ (UTC -> Local) ---
-    // Kiểm tra xem chuỗi có chữ 'Z' ở cuối chưa.
-    // Nếu chưa, ta cộng thêm 'Z' vào để trình duyệt hiểu đây là giờ UTC.
-    // Khi đó: new Date() sẽ tự động +7 tiếng (theo giờ máy tính của bạn).
-    let isoTime = dateString;
-    if (!isoTime.endsWith('Z')) {
-        isoTime = isoTime + 'Z';
-    }
-
-    const date = new Date(isoTime);
-    const now = new Date();
-
-    // Tính khoảng cách (giây)
-    const diffInSeconds = Math.floor((now.getTime() - date.getTime()) / 1000);
-
-    // --- FIX LOGIC HIỂN THỊ TƯƠNG LAI ---
-    // Trường hợp lệch vài giây do độ trễ mạng khiến date > now (diff bị âm)
-    // Ta coi như là "Vừa xong" luôn
-    if (diffInSeconds < 0) return 'Vừa xong';
-
-    // Xử lý các mốc thời gian
-    if (diffInSeconds < 60) return 'Vừa xong';
-    if (diffInSeconds < 3600) return `${Math.floor(diffInSeconds / 60)} phút`;
-    if (diffInSeconds < 86400) return `${Math.floor(diffInSeconds / 3600)} giờ`;
-    if (diffInSeconds < 604800) return `${Math.floor(diffInSeconds / 86400)} ngày`;
-
-    // Nếu quá 7 ngày thì hiện ngày tháng
-    return `${date.getDate()}/${date.getMonth() + 1}`;
-};
-
 const ChatListItem = ({ partner, isActive, onClick }: any) => {
-
     const avatar = useUserAvatar(partner.type === 'people' ? partner.name : null);
     const currentUsername = useAppSelector((state) => state.auth.user?.username);
-
-    // --- SỬA 1: Đưa Hook lấy unreadCount lên trên cùng, RA KHỎI khối if ---
     const unreadCount = useAppSelector(state => state.unread.unreadCounts[partner.name] || 0);
-
-    // --- SỬA 2: Tính toán shouldBold ngay tại đây ---
-    // Chỉ đậm khi: Không active VÀ có tin nhắn chưa đọc
     const shouldBold = !isActive && unreadCount > 0;
 
     const messagesByTarget = useAppSelector((state) => state.chat.messagesByTarget);
@@ -102,18 +82,7 @@ const ChatListItem = ({ partner, isActive, onClick }: any) => {
         ? formatTimeAgo(lastMsg.createAt)
         : formatTimeAgo(partner.actionTime);
 
-
-        console.group(`🕒 Time Debug for: ${partner.name}`);
-        console.log("1. Partner ActionTime (from List API):", partner.actionTime);
-        console.log("2. Messages Loaded count:", messages.length);
-        console.log("3. Last Message Object:", lastMsg);
-        if (lastMsg) {
-            console.log("   -> Last Msg Time:", lastMsg.createAt);
-        }
-        console.log("4. Result Time Display:", lastMsg?.createAt ? formatTimeAgo(lastMsg.createAt) : formatTimeAgo(partner.actionTime));
-        console.groupEnd();
-
-
+    // Logic hiển thị text mặc định
     let previewText = partner.type === 'people' ? 'Chưa có tin nhắn' : 'Phòng chưa có tin nhắn';
 
     if (lastMsg) {
@@ -128,19 +97,34 @@ const ChatListItem = ({ partner, isActive, onClick }: any) => {
         } else {
             const isMe = lastMsg.name === currentUsername;
             let prefix = '';
+
+            // Logic prefix: "Bạn: " hoặc "Tên: "
             if (isMe) {
                 prefix = 'Bạn: ';
             } else if (partner.type === 'room') {
                 prefix = `${lastMsg.name}: `;
             }
-            previewText = prefix + msgContent;
 
+            // --- XỬ LÝ TEXT ---
+            let cleanContent = msgContent;
+
+            // 1. Xử lý Mention: Regex thay thế ***@name*** thành @name
+            // \*\*\* : Tìm 3 dấu sao
+            // (@\w+)   : Group tên (ví dụ @Tuan)
+            // \*\*\* : Tìm 3 dấu sao đóng
+            // $1       : Chỉ lấy cái tên, bỏ dấu sao đi
+            cleanContent = cleanContent.replace(/\*\*\*(@\w+)\*\*\*/g, '$1');
+
+            previewText = prefix + cleanContent;
+
+            // 2. Cắt ngắn nếu quá dài
             if (previewText.length > 30) {
                 previewText = previewText.substring(0, 30) + '...';
             }
+
+            // 3. Xử lý Emoji
             previewText = replaceEmojiShortcodes(previewText);
         }
-        // (Đã xóa đoạn code hooks sai vị trí ở đây)
     }
 
     return (
@@ -168,26 +152,21 @@ const ChatListItem = ({ partner, isActive, onClick }: any) => {
 
             {/* Content Section */}
             <div className="flex-1 min-w-0">
-                {/* DÒNG 1: TÊN (Trái) -------- [Thời gian + Badge] (Phải) */}
                 <div className="flex justify-between items-center mb-0.5">
 
-                    {/* 1. Tên User (Nằm bên trái) */}
+                    {/* Tên User */}
                     <p className={`text-sm truncate mr-2 ${isActive ? 'text-white' : 'text-gray-900 dark:text-white'} ${shouldBold ? 'font-extrabold' : 'font-bold'}`}>
                         {partner.name}
                     </p>
 
-                    {/* 2. Group bên phải: Gom cả Thời gian và Badge vào đây */}
-                    {/* flex-shrink-0 để đảm bảo cụm này không bị co lại khi tên quá dài */}
+                    {/* Group bên phải: Thời gian & Badge */}
                     <div className="flex items-center gap-2 shrink-0">
-
-                        {/* Thời gian */}
                         {timeDisplay && (
                             <span className={`text-[12px] whitespace-nowrap ${isActive ? 'text-blue-100' : (shouldBold ? 'text-blue-600 font-bold' : 'text-gray-400')}`}>
                                 {timeDisplay}
                             </span>
                         )}
 
-                        {/* Badge số đỏ hoặc Dot trắng */}
                         {shouldBold ? (
                             <span className="bg-red-500 text-white text-[10px] px-1.5 py-0.5 rounded-full min-w-[18px] text-center">
                                 {unreadCount > 9 ? '9+' : unreadCount}
@@ -198,7 +177,7 @@ const ChatListItem = ({ partner, isActive, onClick }: any) => {
                     </div>
                 </div>
 
-                {/* DÒNG 2: Preview tin nhắn */}
+                {/* Preview text */}
                 <p className={`text-xs truncate font-medium 
                     ${isActive ? 'text-blue-100' : 'text-gray-500 dark:text-gray-400'}
                     ${shouldBold && !isActive ? 'text-gray-900 dark:text-white font-bold' : ''} 

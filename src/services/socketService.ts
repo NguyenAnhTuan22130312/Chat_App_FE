@@ -6,7 +6,7 @@ import {
     socketDisconnected,
     socketConnectionError
 } from "../store/slices/authSlice";
-import {addMessage, ChatMessage, clearMessages, setMessages} from "../store/slices/chatSlice";
+import {addMessage, ChatMessage, clearMessages, setMessages,addHistoryMessages} from "../store/slices/chatSlice";
 import {store} from "../store/store";
 import {ChatPartner, setPartners, updatePartnerOnline} from "../store/slices/chatPartnerSlice";
 import {increaseUnread} from "../store/slices/unreadSlice";
@@ -18,7 +18,8 @@ const MAX_RECONNECT_ATTEMPTS = 5;
 
 
 const CHAT_WHITELIST = [
-    '22130302', 'trunghan', 'anhtuan12', 'hantr', 'long'
+    '22130302', 'trunghan', 'anhtuan12', 'hantr', 'long','AnhTuan11','Qte','tuanroomtest','tuantest',
+    '22130312_anhtuan', '22130302_hantrung', '22130311_NguyenAnhTuan', 'Nhom_63'
 ];
 
 class SocketService {
@@ -82,6 +83,7 @@ class SocketService {
     private handleServerResponse(receivedData: any) {
         const payload = receivedData.action === 'onchat' ? receivedData.data : receivedData;
         const {event, status, data: responseData} = payload;
+        const IS_STRESS_TEST_MODE = false;
 
         // Lấy thông tin chat hiện tại từ Redux store để so sánh
         const currentChatState = store.getState().currentChat;
@@ -109,50 +111,63 @@ class SocketService {
                     break;
 
                 case 'GET_PEOPLE_CHAT_MES':
-                    // Case này hơi khó vì nếu mảng rỗng thì không biết ai là partner để set
                     if (Array.isArray(responseData) && responseData.length > 0) {
                         const lastMsg = responseData[0];
-
-                        // Logic xác định mình đang chat với ai
                         const partnerName = lastMsg.name === myUsername ? lastMsg.to : lastMsg.name;
 
-                        // 1. Chuẩn hóa dữ liệu (Reverse để tin mới nhất ở dưới cùng)
+                        // Chuẩn hóa dữ liệu (Reverse để tin mới nhất ở dưới cùng của mảng trả về)
                         const history = [...responseData].reverse();
 
-                        // 2. Dispatch vào Slice Mới
-                        // LƯU Ý: Không cần check currentChatState.name === partnerName
-                        // Cứ lưu vào store, dù user có đang xem hay không.
-                        store.dispatch(setMessages({
-                            target: partnerName,
-                            messages: history
-                        }));
+                        // --- KIỂM TRA LOGIC LOAD MORE ---
+                        // Lấy state hiện tại từ store để xem đã có tin nhắn chưa
+                        const currentMsgs = store.getState().chat.messagesByTarget[partnerName];
+
+                        if (!currentMsgs || currentMsgs.length === 0) {
+                            // Trường hợp 1: Chưa có tin nhắn nào (Load lần đầu - Page 1)
+                            store.dispatch(setMessages({
+                                target: partnerName,
+                                messages: history
+                            }));
+                        } else {
+                            // Trường hợp 2: Đã có tin nhắn (Load thêm - Page 2,3...)
+                            store.dispatch(addHistoryMessages({
+                                target: partnerName,
+                                messages: history
+                            }));
+                        }
 
                     } else if (Array.isArray(responseData) && responseData.length === 0) {
-                        // Nếu mảng rỗng, ta chỉ có thể clear nếu đang mở đúng chat đó
-                        // (Do API không trả về tên người khi mảng rỗng)
+                        // Mảng rỗng: Nếu là lần đầu load thì clear, nếu đang load more thì thôi
+                        // (Logic này giữ nguyên hoặc tùy chỉnh)
                         if (currentChatState.type === 'people' && currentChatState.name) {
-                            store.dispatch(setMessages({
-                                target: currentChatState.name,
-                                messages: []
-                            }));
+                            const currentMsgs = store.getState().chat.messagesByTarget[currentChatState.name];
+                            if (!currentMsgs || currentMsgs.length === 0) {
+                                store.dispatch(setMessages({ target: currentChatState.name, messages: [] }));
+                            }
                         }
                     }
                     break;
 
                 case 'GET_ROOM_CHAT_MES':
-                    if (responseData && responseData.name) { // Check kỹ hơn chút
+                    if (responseData && responseData.name) {
                         const roomName = responseData.name;
-                        const chatData = responseData.chatData || []; // Fallback nếu null
-
-                        // 1. Chuẩn hóa dữ liệu
+                        const chatData = responseData.chatData || [];
                         const history = [...chatData].reverse();
 
-                        // 2. Dispatch vào Slice Mới
-                        // Tương tự, lưu luôn vào store theo target là tên phòng
-                        store.dispatch(setMessages({
-                            target: roomName,
-                            messages: history
-                        }));
+                        // --- KIỂM TRA LOGIC LOAD MORE (Tương tự People) ---
+                        const currentMsgs = store.getState().chat.messagesByTarget[roomName];
+
+                        if (!currentMsgs || currentMsgs.length === 0) {
+                            store.dispatch(setMessages({
+                                target: roomName,
+                                messages: history
+                            }));
+                        } else {
+                            store.dispatch(addHistoryMessages({
+                                target: roomName,
+                                messages: history
+                            }));
+                        }
                     }
                     break;
 
@@ -220,10 +235,7 @@ class SocketService {
                     break;
 
                 case 'GET_USER_LIST':
-
                     // console.group("🔍 DEBUG GET_USER_LIST");
-                    // console.log("1. Raw Response Data:", responseData);
-                    // console.log("2. Total count from Server:", Array.isArray(responseData) ? responseData.length : 'Not Array');
 
                     if (Array.isArray(responseData)) {
                         // 1. Map dữ liệu thô sang format chuẩn
@@ -234,28 +246,40 @@ class SocketService {
                             isOnline: false,
                         }));
 
+                        // 2. XỬ LÝ LỌC (Logic Key Test Tải)
+                        let partnersToProcess: ChatPartner[] = [];
 
-                        // 2. LỌC NGAY TẠI ĐÂY (Logic Whitelist)
-                        // Chỉ giữ lại những người có tên trong CHAT_WHITELIST
-                        const whitelistedPartners = allPartners.filter(p => CHAT_WHITELIST.includes(p.name));
+                        if (IS_STRESS_TEST_MODE) {
+                            // [TEST MODE] Lấy tất cả, không lọc gì cả
+                            console.warn(`⚠️ ĐANG CHẠY CHẾ ĐỘ STRESS TEST: Load toàn bộ ${allPartners.length} users!`);
+                            partnersToProcess = allPartners;
+                        } else {
+                            // [NORMAL MODE] Chỉ giữ lại whitelist
+                            partnersToProcess = allPartners.filter(p => CHAT_WHITELIST.includes(p.name));
+                        }
 
-                        // 3. Sắp xếp (nếu cần)
-                        whitelistedPartners.sort((a, b) => {
+                        // 3. Sắp xếp (Áp dụng cho danh sách đã chọn)
+                        partnersToProcess.sort((a, b) => {
                             if (!a.actionTime || !b.actionTime) return 0;
+                            // Note: Dòng console.log cũ của bạn nằm sau return nên ko chạy đâu nhé, mình bỏ đi cho gọn
                             return new Date(b.actionTime).getTime() - new Date(a.actionTime).getTime();
-                            console.log(a.actionTime,b.actionTime);
                         });
 
-                        // 4. DISPATCH (Lúc này trong Slice chỉ có những người trong Whitelist)
-                        store.dispatch(setPartners(whitelistedPartners));
+                        // 4. DISPATCH
+                        store.dispatch(setPartners(partnersToProcess));
 
                         this.checkOnlineQueue = [];
 
-                        // 5. Chạy vòng lặp lấy dữ liệu chi tiết (Dùng chính list đã lọc để chạy)
-                        whitelistedPartners.forEach((partner, index) => {
+                        // 5. Chạy vòng lặp lấy dữ liệu chi tiết
+                        // Lưu ý: Nếu list quá dài (vd: 1000 user), việc set timeout này sẽ kéo dài rất lâu
+                        partnersToProcess.forEach((partner, index) => {
+                            // Nếu test tải, có thể giảm delay xuống (vd: 50ms) để spam nhanh hơn,
+                            // hoặc giữ 300ms để giả lập hành vi người dùng thật.
+                            const delayTime = IS_STRESS_TEST_MODE ? 100 : 300;
+
                             setTimeout(() => {
                                 if (partner.type === 'people') {
-                                    // A. Ghi tên vào hàng đợi (Xếp hàng)
+                                    // A. Ghi tên vào hàng đợi
                                     this.checkOnlineQueue.push(partner.name);
 
                                     // B. Gửi câu hỏi lên Server
@@ -264,11 +288,10 @@ class SocketService {
                                 } else if (partner.type === 'room') {
                                     this.getRoomHistory(partner.name, 1);
                                 }
-                            }, index * 300);
+                            }, index * delayTime);
                         });
                     }
                     break;
-
                 case 'CREATE_ROOM':
                 case 'JOIN_ROOM':
                     this.getUserList();
@@ -357,11 +380,13 @@ class SocketService {
         this.send({event: 'SEND_CHAT', data: {type: 'people', to: toUser, mes: message}});
     }
 
-    getHistory(partnerName: string) {
-        this.send({event: 'GET_PEOPLE_CHAT_MES', data: {name: partnerName, page: 1}});
+// Hàm gọi API có page (Bạn đã có, mình chỉ viết lại cho chắc)
+    public getHistory(partnerName: string, page: number = 1) {
+        console.log(`📡 Requesting history for ${partnerName} - Page: ${page}`);
+        this.send({event: 'GET_PEOPLE_CHAT_MES', data: {name: partnerName, page}});
     }
 
-    getRoomHistory(roomName: string, page: number = 1) {
+    public getRoomHistory(roomName: string, page: number = 1) {
         this.send({event: 'GET_ROOM_CHAT_MES', data: {name: roomName, page}});
     }
 
