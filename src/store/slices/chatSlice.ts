@@ -1,11 +1,6 @@
 import {createSlice, PayloadAction} from "@reduxjs/toolkit";
 
 export interface ChatMessage {
-    // name: string;
-    // mes: string;
-    // to?: string;
-    // createAt?: string;
-
     name: string;
     type: 'people' | 'room';
     to?: string;
@@ -16,10 +11,12 @@ export interface ChatMessage {
 
 interface ChatState {
     messagesByTarget: Record<string, ChatMessage[]>;
+    pinnedMessages: Record<string, ChatMessage | null>;
 }
 
 const initialState: ChatState = {
     messagesByTarget: {},
+    pinnedMessages: {},
 };
 
 const chatSlice = createSlice({
@@ -53,6 +50,7 @@ const chatSlice = createSlice({
             state.messagesByTarget[target] = [...uniqueIncoming, ...currentMessages];
 
             console.log(`📜 Loaded history for ${target}: added ${uniqueIncoming.length} msgs`);
+            
         },
 
         addMessage: (
@@ -72,8 +70,16 @@ const chatSlice = createSlice({
         clearMessages: (state, action: PayloadAction<{ target: string }>) => {
             delete state.messagesByTarget[action.payload.target];
         },
+
+        setPinnedMessage: (state, action: PayloadAction<{ target: string; message: ChatMessage | null }>) => {
+            if (action.payload.message) {
+                state.pinnedMessages[action.payload.target] = action.payload.message;
+            } else {
+                delete state.pinnedMessages[action.payload.target];
+            }
+        },
     },
 });
 
-export const {setMessages, addMessage, clearMessages,addHistoryMessages} = chatSlice.actions;
+export const {setMessages, addMessage, clearMessages,addHistoryMessages,setPinnedMessage} = chatSlice.actions;
 export default chatSlice.reducer;

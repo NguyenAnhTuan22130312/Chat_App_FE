@@ -1,5 +1,7 @@
 import { initializeApp } from "firebase/app";
-import { getDatabase, ref, set, get } from "firebase/database";
+
+import { getDatabase, ref, set, onValue, get, remove } from "firebase/database";
+
 
 const firebaseConfig = {
     apiKey: "AIzaSyDxNeJCm4u-9u1mots-oM1l0t8_BeKeo_o",
@@ -32,6 +34,36 @@ export const saveAvatarToFirebase = (username: string, avatarUrl: string) => {
     const safeUsername = sanitizeFirebaseKey(username);
     const userRef = ref(database, 'users/' + safeUsername + '/avatar');
     set(userRef, avatarUrl).catch(err => console.error("Lỗi lưu Firebase:", err));
+};
+
+const getChatKey = (user1: string, user2: string) => {
+    return [user1, user2].sort().join('_'); 
+};
+
+export const savePinnedMessageToFirebase = (currentUser: string, targetUser: string, message: any) => {   
+    const chatKey = message.type === 'room' ? targetUser : getChatKey(currentUser, targetUser);
+    const pinRef = ref(database, `pins/${chatKey}`);
+    
+    set(pinRef, message).catch(err => console.error("Lỗi ghim tin nhắn:", err));
+};
+
+export const removePinnedMessageFromFirebase = (currentUser: string, targetUser: string, type: 'room' | 'people') => {
+    const chatKey = type === 'room' ? targetUser : getChatKey(currentUser, targetUser);
+    const pinRef = ref(database, `pins/${chatKey}`);
+    
+    remove(pinRef).catch(err => console.error("Lỗi bỏ ghim:", err));
+};
+
+export const listenForPinnedMessages = (currentUser: string, targetUser: string, type: 'room' | 'people', callback: (msg: any) => void) => {
+    const chatKey = type === 'room' ? targetUser : getChatKey(currentUser, targetUser);
+    const pinRef = ref(database, `pins/${chatKey}`);
+
+    const unsubscribe = onValue(pinRef, (snapshot) => {
+        const data = snapshot.val();
+        callback(data); 
+    });
+
+    return unsubscribe;
 };
 
 export const getAvatarFromFirebase = async (username: string): Promise<string | null> => {
