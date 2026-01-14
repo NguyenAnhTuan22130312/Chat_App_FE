@@ -300,7 +300,13 @@ class SocketService {
                         if (IS_STRESS_TEST_MODE) {
                             partnersToProcess = allPartners;
                         } else {
+                            console.log("🔥 Whitelist hiện tại:", this.whitelist);
+                            console.log("🔥 Server trả về:", allPartners.map(p => p.name));
+
+                            // Lọc
                             partnersToProcess = allPartners.filter(p => this.whitelist.includes(p.name));
+
+                            console.log("🔥 Sau khi lọc:", partnersToProcess.map(p => p.name));
                         }
 
                         partnersToProcess.sort((a, b) => {
@@ -352,7 +358,13 @@ class SocketService {
                     }
                     break;
                 case 'JOIN_ROOM':
-                    this.getUserList();
+                    if (responseData && responseData.name) {
+                        const joinedRoomName = responseData.name;
+                        console.log(`✅ Đã tham gia phòng: ${joinedRoomName}`);
+                        if (myUsername) {
+                            addGroupToFirebase(myUsername, joinedRoomName);
+                        }
+                    }
                     break;
 
                 case 'CHECK_USER_ONLINE':

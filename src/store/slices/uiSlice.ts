@@ -3,14 +3,21 @@ import { ChatMessage } from "./chatSlice";
 
 interface UiState {
     activeSidebarTab: 'chats' | 'contacts';
+
+    activeContactTab: 'friends' | 'groups' | 'friendRequests' | 'groupInvites' | 'hiddenGroups' | 'blocks';
+
     replyingTo: {
         target: string | null;
         message: ChatMessage | null;
     };
+
 }
 
 const initialState: UiState = {
     activeSidebarTab: 'chats',
+
+    activeContactTab: 'friends',
+
     replyingTo: {
         target: null,
         message: null,
@@ -24,6 +31,15 @@ const uiSlice = createSlice({
         setActiveSidebarTab: (state, action: PayloadAction<'chats' | 'contacts'>) => {
             state.activeSidebarTab = action.payload;
         },
+
+        setActiveContactTab: (state, action: PayloadAction<UiState['activeContactTab']>) => {
+            state.activeContactTab = action.payload;
+        },
+    },
+});
+
+export const { setActiveSidebarTab,setActiveContactTab } = uiSlice.actions;
+
         setReplyingTo: (state, action: PayloadAction<{ target: string; message: ChatMessage } | null>) => {
             if (action.payload) {
                 state.replyingTo = {
