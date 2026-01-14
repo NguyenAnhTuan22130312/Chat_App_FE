@@ -1,17 +1,31 @@
-import React from 'react';
+import React, { useState, useMemo } from 'react';
 import {replaceEmojiShortcodes} from '../../utils/emojiShortcodes';
 import {COLOR_MAP} from '../../constants/colors';
+import { ChatMessage } from '../../store/slices/chatSlice';
+import { truncateMessage, parseReplyMessage } from '../../utils/replyUtils';
 
 interface MessageBubbleProps {
     text: string;
     isMe: boolean;
     avatar?: string;
     timestamp?: string;
-    hasAvatarPlaceholder?: boolean;
     senderName?: string;
+    replyTo?: ChatMessage['replyTo'];
+    onReply?: () => void;
+    onPin?: () => void;
 }
 
-const MessageBubble = ({text, isMe, avatar,timestamp,hasAvatarPlaceholder,senderName}: MessageBubbleProps) => {
+const MessageBubble = ({text, isMe, avatar, timestamp, senderName, replyTo, onReply, onPin}: MessageBubbleProps) => {
+    const [showActions, setShowActions] = useState(false);
+
+    const { actualText, parsedReplyTo } = useMemo(() => {
+        const parsed = parseReplyMessage(text);
+        return {
+            actualText: parsed.mes,
+            parsedReplyTo: parsed.replyTo || replyTo
+        };
+    }, [text, replyTo]);
+
     const isImageUrl = (url: string) => {
         if (!url) return false;
         const hasImageExtension = /\.(jpeg|jpg|gif|png|webp|bmp)$/i.test(url);
@@ -67,12 +81,16 @@ const MessageBubble = ({text, isMe, avatar,timestamp,hasAvatarPlaceholder,sender
         return <span dangerouslySetInnerHTML={{__html: html}} className="whitespace-pre-wrap"/>;
     };
 
-    const message = parseMessage(text);
+    const message = parseMessage(actualText);
     const isImage = message.type === 'image';
 
     return (
 
-        <div className={`flex items-end mb-1 ${isMe ? 'justify-end' : 'justify-start'}`}>
+        <div 
+            className={`flex items-end mb-1 ${isMe ? 'justify-end' : 'justify-start'} group relative`}
+            onMouseEnter={() => setShowActions(true)}
+            onMouseLeave={() => setShowActions(false)}
+        >
 
             {!isMe && (
                 <div className="w-8 h-8 mr-2 shrink-0 flex items-start">
@@ -106,6 +124,26 @@ const MessageBubble = ({text, isMe, avatar,timestamp,hasAvatarPlaceholder,sender
                     )}
                     `}
                 >
+                    {/* Quoted Message */}
+                    {parsedReplyTo && !isImage && (
+                        <div className={`mb-2 pb-2 border-l-2 pl-2 ${
+                            isMe 
+                                ? 'border-blue-200 bg-blue-500/20' 
+                                : 'border-gray-400 dark:border-gray-500 bg-gray-200 dark:bg-gray-600'
+                        } rounded-r`}>
+                            <div className={`text-[11px] font-semibold mb-0.5 ${
+                                isMe ? 'text-blue-100' : 'text-gray-700 dark:text-gray-300'
+                            }`}>
+                                {parsedReplyTo.senderName}
+                            </div>
+                            <div className={`text-[13px] ${
+                                isMe ? 'text-blue-50' : 'text-gray-600 dark:text-gray-400'
+                            }`}>
+                                {truncateMessage(replaceEmojiShortcodes(parsedReplyTo.message), 50)}
+                            </div>
+                        </div>
+                    )}
+
                     <div className={timestamp ? "mb-1" : ""}>
                         {message.type === 'image' ? (
                             <img
@@ -137,8 +175,49 @@ const MessageBubble = ({text, isMe, avatar,timestamp,hasAvatarPlaceholder,sender
                     </div>
                 )}
             </div>
+
+            {/* Action Buttons - Hiển thị khi hover */}
+            {showActions && onReply && (
+                <div className={`absolute top-0 ${isMe ? 'left-0 -translate-x-full' : 'right-0 translate-x-full'} flex items-center gap-1 px-2`}>
+                    {/* Reply Button */}
+                    <button
+                        onClick={onReply}
+                        className="p-1.5 bg-white dark:bg-gray-800 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-full shadow-md transition-all"
+                        title="Trả lời"
+                    >
+                        <svg className="w-4 h-4 text-gray-600 dark:text-gray-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 10h10a8 8 0 018 8v2M3 10l6 6m-6-6l6-6" />
+                        </svg>
+                    </button>
+
+                    {/* Pin Button */}
+                    {onPin && (
+                        <button
+                            onClick={onPin}
+                            className="p-1.5 bg-white dark:bg-gray-800 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-full shadow-md transition-all"
+                            title="Ghim tin nhắn"
+                        >
+                            <svg className="w-4 h-4 text-gray-600 dark:text-gray-300" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round">
+                                <line x1="12" y1="17" x2="12" y2="22"></line>
+                                <path d="M5 17h14v-1.76a2 2 0 0 0-1.11-1.79l-1.78-.9A2 2 0 0 1 15 10.76V6h1a2 2 0 0 0 0-4H8a2 2 0 0 0 0 4h1v4.76a2 2 0 0 1-1.11 1.79l-1.78.9A2 2 0 0 0 5 15.24Z"></path>
+                            </svg>
+                        </button>
+                    )}
+
+                    {/* More Button */}
+                    <button
+                        className="p-1.5 bg-white dark:bg-gray-800 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-full shadow-md transition-all"
+                        title="Thêm"
+                    >
+                        <svg className="w-4 h-4 text-gray-600 dark:text-gray-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 12h.01M12 12h.01M19 12h.01M6 12a1 1 0 11-2 0 1 1 0 012 0zm7 0a1 1 0 11-2 0 1 1 0 012 0zm7 0a1 1 0 11-2 0 1 1 0 012 0z" />
+                        </svg>
+                    </button>
+                </div>
+            )}
         </div>
-    );;
+    );
 };
 
 export default React.memo(MessageBubble);
+
