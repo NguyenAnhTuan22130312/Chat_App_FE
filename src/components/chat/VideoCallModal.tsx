@@ -1,4 +1,4 @@
-import React, { useEffect, useRef } from 'react';
+import React, { useEffect, useRef ,useState} from 'react';
 
 
 interface VideoCallProps {
@@ -17,6 +17,30 @@ export default function VideoCallModal({
 }: VideoCallProps) {
    const localVideoRef = useRef<HTMLVideoElement>(null);
    const remoteVideoRef = useRef<HTMLVideoElement>(null);
+
+   const [seconds, setSeconds] = useState(0);
+
+   const formatTime = (totalSeconds: number) => {
+    const m = Math.floor(totalSeconds / 60).toString().padStart(2, '0');
+    const s = (totalSeconds % 60).toString().padStart(2, '0');
+    return `${m}:${s}`;
+};
+
+useEffect(() => {
+    let interval: NodeJS.Timeout;
+
+    if (status === 'connected') {
+        setSeconds(0);
+        
+        interval = setInterval(() => {
+            setSeconds(prev => prev + 1);
+        }, 1000);
+    } else {
+        setSeconds(0);
+    }
+
+    return () => clearInterval(interval);
+}, [status]);
 
 
    useEffect(() => {
@@ -40,7 +64,7 @@ export default function VideoCallModal({
                <div className="absolute top-0 w-full p-4 z-10 bg-gradient-to-b from-black/70 to-transparent text-white text-center">
                    <h2 className="text-xl font-bold">{partnerName}</h2>
                    <p className="text-sm opacity-80">
-                       {isIncoming ? "Đang gọi cho bạn..." : status === 'connected' ? "00:00" : "Đang kết nối..."}
+                       {isIncoming ? "Đang gọi cho bạn..." : status === 'connected' ? formatTime(seconds) : "Đang kết nối..."}
                    </p>
                </div>
 

@@ -77,9 +77,13 @@ export const useWebRTC = (currentPartner: string) => {
 
    // 2. Lắng nghe tín hiệu từ SocketService
    useEffect(() => {
-       socketService.registerWebRTCListener(async (sender, payload) => {
-           // Chỉ nhận tín hiệu từ người đang chat cùng
-           if (sender !== currentPartner) return;
+       socketService.registerWebRTCListener(async (sender, payload,target) => {
+           
+            if (chatType === 'people') {
+                if (sender !== currentPartner) return;
+            } else if (chatType === 'room') {
+                if (target !== currentPartner) return;
+            }
 
 
            if (!peerConnection.current && payload.type !== 'OFFER') return;
@@ -121,7 +125,7 @@ export const useWebRTC = (currentPartner: string) => {
 
        return () => {
        };
-   }, [currentPartner, createPeerConnection]);
+   }, [currentPartner, createPeerConnection,chatType]);
 
 
 
