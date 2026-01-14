@@ -1,5 +1,5 @@
 import { initializeApp } from "firebase/app";
-import { getDatabase, ref, set, onValue, get } from "firebase/database";
+import { getDatabase, ref, set, get } from "firebase/database";
 
 const firebaseConfig = {
     apiKey: "AIzaSyDxNeJCm4u-9u1mots-oM1l0t8_BeKeo_o",
@@ -12,19 +12,31 @@ const firebaseConfig = {
     measurementId: "G-01SVVT8DJ2"
 };
 
-
 const app = initializeApp(firebaseConfig);
 export const database = getDatabase(app);
 
+// --- HÀM MỚI CẦN THÊM (SỬA LỖI TS2305) ---
+export const sanitizeFirebaseKey = (key: string): string => {
+    if (!key) return "";
+    return key
+        .replace(/\./g, '_dot_')
+        .replace(/#/g, '_hash_')
+        .replace(/\$/g, '_dollar_')
+        .replace(/\[/g, '_bracket_open_')
+        .replace(/\]/g, '_bracket_close_')
+        .replace(/@/g, '_at_');
+};
+
 export const saveAvatarToFirebase = (username: string, avatarUrl: string) => {
-    const userRef = ref(database, 'users/' + username);
-    set(userRef, {
-        avatar: avatarUrl
-    }).catch(err => console.error("Lỗi lưu Firebase:", err));
+    // Nên dùng sanitize ở đây luôn để tránh lỗi nếu tên có ký tự lạ
+    const safeUsername = sanitizeFirebaseKey(username);
+    const userRef = ref(database, 'users/' + safeUsername + '/avatar');
+    set(userRef, avatarUrl).catch(err => console.error("Lỗi lưu Firebase:", err));
 };
 
 export const getAvatarFromFirebase = async (username: string): Promise<string | null> => {
-    const userRef = ref(database, 'users/' + username + '/avatar');
+    const safeUsername = sanitizeFirebaseKey(username);
+    const userRef = ref(database, 'users/' + safeUsername + '/avatar');
     try {
         const snapshot = await get(userRef);
         if (snapshot.exists()) {
