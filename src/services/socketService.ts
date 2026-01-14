@@ -370,7 +370,7 @@ class SocketService {
     }
 
     public getHistory(partnerName: string, page: number = 1) {
-        console.log(`📡 Requesting history for ${partnerName} - Page: ${page}`);
+        console.log(`Requesting history for ${partnerName} - Page: ${page}`);
         this.send({event: 'GET_PEOPLE_CHAT_MES', data: {name: partnerName, page}});
     }
 
