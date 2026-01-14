@@ -62,18 +62,25 @@ class SocketService {
         this.onWebRTCSignal = callback;
     }
 
-    public sendWebRTCSignal(toUser: string, data: any) {
+    public sendWebRTCSignal(target: string, data: any, type: 'people' | 'room' = 'people') {
         const signalMessage = JSON.stringify({
             type: 'WEBRTC_SIGNAL',
             payload: data
         });
-        this.sendMessageToPeople(toUser, signalMessage);
+        if (type === 'room') {
+            this.sendMessageToRoom(target, signalMessage);
+        } else {
+            this.sendMessageToPeople(target, signalMessage);
+        }
     }
 
     private isWebRTCSignal(mes: string): any | null {
         try {
-            if (!mes.startsWith('{')) return null;
-            const parsed = JSON.parse(mes);
+            if (!mes || typeof mes !== 'string') return null;
+            const cleaned = mes.trim(); 
+            if (!cleaned.startsWith('{')) return null;
+            
+            const parsed = JSON.parse(cleaned);
             if (parsed && parsed.type === 'WEBRTC_SIGNAL') {
                 return parsed.payload;
             }

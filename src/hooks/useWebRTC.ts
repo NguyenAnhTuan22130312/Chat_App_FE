@@ -21,6 +21,7 @@ export const useWebRTC = (currentPartner: string) => {
 
    const peerConnection = useRef<RTCPeerConnection | null>(null);
    const { user } = useAppSelector(state => state.auth);
+   const chatType = useAppSelector(state => state.currentChat.type) || 'people';
 
 
    const createPeerConnection = useCallback(() => {
@@ -35,7 +36,7 @@ export const useWebRTC = (currentPartner: string) => {
                socketService.sendWebRTCSignal(currentPartner, {
                    type: 'CANDIDATE',
                    candidate: event.candidate
-               });
+               },chatType);
            }
        };
 
@@ -59,7 +60,7 @@ export const useWebRTC = (currentPartner: string) => {
 
        peerConnection.current = pc;
        return pc;
-   }, [currentPartner]);
+   }, [currentPartner,chatType]);
 
 
    // 2. Lắng nghe tín hiệu từ SocketService
@@ -149,7 +150,7 @@ export const useWebRTC = (currentPartner: string) => {
        socketService.sendWebRTCSignal(currentPartner, {
            type: 'OFFER',
            offer: offer
-       });
+       },chatType);
    };
 
 
@@ -180,7 +181,7 @@ export const useWebRTC = (currentPartner: string) => {
        socketService.sendWebRTCSignal(currentPartner, {
            type: 'ANSWER',
            answer: answer
-       });
+       },chatType);
    };
 
 
@@ -201,7 +202,7 @@ export const useWebRTC = (currentPartner: string) => {
 
 
        // Gửi tín hiệu kết thúc cho bên kia
-       socketService.sendWebRTCSignal(currentPartner, { type: 'END_CALL' });
+       socketService.sendWebRTCSignal(currentPartner, { type: 'END_CALL' },chatType);
    };
 
 
