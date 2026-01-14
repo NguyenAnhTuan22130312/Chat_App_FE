@@ -9,6 +9,7 @@ import { parseDate } from "../../utils/dateUtils";
 import { setMessages } from '../../store/slices/chatSlice';
 import { useWebRTC } from '../../hooks/useWebRTC';
 import VideoCallModal from './VideoCallModal';
+import PinnedMessageBar from './PinnedMessageBar';
 
 
 const GROUPING_THRESHOLD_MINUTES = 10;
@@ -166,7 +167,7 @@ export default function ChatWindow() {
    return (
        <div className="flex flex-col h-screen bg-white dark:bg-gray-900 w-full border-l border-gray-300 dark:border-gray-700 relative">
            <ChatHeader onCallClick={startCall} />
-
+           <PinnedMessageBar />
 
            <div
                ref={scrollContainerRef}
