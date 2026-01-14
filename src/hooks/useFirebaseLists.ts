@@ -9,6 +9,8 @@ export function useFirebaseLists(myUsername: string | null | undefined) {
     const [groupInvites, setGroupInvites] = useState<{group: string, inviter: string}[]>([]);
     const [blocks, setBlocks] = useState<string[]>([]);
 
+    const [hiddenGroups, setHiddenGroups] = useState<string[]>([]);
+
     useEffect(() => {
         if (!myUsername) return;
         const safeMe = sanitizeFirebaseKey(myUsername);
@@ -68,14 +70,24 @@ export function useFirebaseLists(myUsername: string | null | undefined) {
             }
         });
 
+        const hiddenRef = ref(database, `users/${safeMe}/hiddenGroups`);
+        const unsubHidden = onValue(hiddenRef, (snapshot) => {
+            if (snapshot.exists()) {
+                setHiddenGroups(Object.keys(snapshot.val()));
+            } else {
+                setHiddenGroups([]);
+            }
+        });
+
         return () => {
             unsubFriends();
             unsubGroups();
             unsubReq();
             unsubInvites();
             unsubBlock();
+            unsubHidden();
         };
     }, [myUsername]);
 
-    return { friends, groups, friendRequests, groupInvites, blocks };
+    return { friends, groups, friendRequests, groupInvites, blocks,hiddenGroups };
 }

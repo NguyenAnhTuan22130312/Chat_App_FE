@@ -126,36 +126,21 @@ export const unblockUser = async (myUsername: string, targetUsername: string) =>
     await remove(ref(database, `users/${safeMe}/blocks/${safeTarget}`));
 };
 
-
-// ==========================================
-// 5. NHÓM & LỜI MỜI VÀO NHÓM
-// ==========================================
-
-// Gửi lời mời (Add user vào list invited của user đó)
 export const inviteUserToGroup = async (targetUsername: string, groupName: string, inviterName: string) => {
     const safeTarget = sanitizeFirebaseKey(targetUsername);
-    // groupName cũng có thể cần sanitize nếu nó chứa ký tự lạ
-
-    // Cấu trúc: users -> target -> groupInvites -> GroupName: InviterName
     const inviteRef = ref(database, `users/${safeTarget}/groupInvites/${groupName}`);
     await set(inviteRef, inviterName); // Lưu tên người mời để hiển thị "A đã mời bạn vào nhóm B"
 };
 
-// Chấp nhận vào nhóm
 export const acceptGroupInvite = async (myUsername: string, groupName: string) => {
     const canAdd = await checkCanAddMore(myUsername);
     if (!canAdd) {
         throw new Error(`Danh sách đã đầy. Không thể tham gia thêm nhóm.`);
     }
-
     const safeMe = sanitizeFirebaseKey(myUsername);
-
     const updates: any = {};
-    // Thêm vào list groups
     updates[`users/${safeMe}/groups/${groupName}`] = true;
-    // Xóa lời mời
     updates[`users/${safeMe}/groupInvites/${groupName}`] = null;
-
     await update(ref(database), updates);
 };
 
@@ -182,4 +167,31 @@ export const addGroupToFirebase = async (myUsername: string, groupName: string) 
     } catch (error) {
         console.error("Lỗi lưu nhóm Firebase:", error);
     }
+
+};
+export const hideGroup = async (myUsername: string, groupName: string) => {
+    const safeMe = sanitizeFirebaseKey(myUsername);
+    const updates: any = {};
+
+    // Xóa khỏi danh sách chính
+    updates[`users/${safeMe}/groups/${groupName}`] = null;
+    // Thêm vào danh sách ẩn
+    updates[`users/${safeMe}/hiddenGroups/${groupName}`] = true;
+
+    await update(ref(database), updates);
+};
+
+export const unhideGroup = async (myUsername: string, groupName: string) => {
+    const canAdd = await checkCanAddMore(myUsername);
+    if (!canAdd) {
+        throw new Error("Danh sách chính đã đầy (4/4). Hãy ẩn bớt nhóm hoặc xóa bạn bè trước.");
+    }
+
+    const safeMe = sanitizeFirebaseKey(myUsername);
+    const updates: any = {};
+
+    updates[`users/${safeMe}/hiddenGroups/${groupName}`] = null;
+    updates[`users/${safeMe}/groups/${groupName}`] = true;
+
+    await update(ref(database), updates);
 };
