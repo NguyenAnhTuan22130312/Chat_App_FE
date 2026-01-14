@@ -1,10 +1,13 @@
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { socketService } from '../../services/socketService';
 import { useAppDispatch, useAppSelector } from '../../hooks/reduxHooks';
 import { addMessage } from '../../store/slices/chatSlice';
 import EmojiStickerPicker from './EmojiStickerPicker';
 import MarkdownToolbar from './MarkdownToolbar';
 import RichTextInput from './RichTextInput';
+import ReplyPreview from './ReplyPreview';
+import { formatReplyMessage } from '../../utils/replyUtils';
+import { clearReplyingTo } from '../../store/slices/uiSlice';
 
 const CLOUD_NAME = "dox9vbxjn";
 const UPLOAD_PRESET = "chat_app_preset";
@@ -21,6 +24,7 @@ export default function ChatInput() {
     const { user } = useAppSelector((state) => state.auth);
     // Lấy danh sách partners để kiểm tra tên có tồn tại không
     const { partners } = useAppSelector((state) => state.chatPartner);
+    const { replyingTo } = useAppSelector((state) => state.ui);
 
     const dispatch = useAppDispatch();
 
@@ -56,15 +60,22 @@ export default function ChatInput() {
     const sendMessage = async (content: string) => {
         if (!currentName || !currentType) return;
 
-        // --- BƯỚC 1: Xử lý Mention trước khi gửi ---
-        const formattedContent = processMentions(content);
+        let formattedContent = processMentions(content);
+        if (replyingTo.message && replyingTo.target === currentName) {
+            formattedContent = formatReplyMessage(replyingTo.message, formattedContent);
+        }
 
         const tempMessage = {
             name: user?.username || 'me',
             mes: formattedContent, // Dùng nội dung đã format
             type: currentType,
             to: currentName,
-            createAt: new Date().toISOString()
+            createAt: new Date().toISOString(),
+            replyTo: replyingTo.message && replyingTo.target === currentName ? {
+                senderName: replyingTo.message.name,
+                message: replyingTo.message.mes,
+                timestamp: replyingTo.message.createAt,
+            } : undefined,
         };
 
         dispatch(addMessage({
@@ -90,7 +101,20 @@ export default function ChatInput() {
         if (!text.trim()) return;
         sendMessage(text);
         setText('');
+        dispatch(clearReplyingTo());
     };
+
+    const handleCancelReply = () => {
+        dispatch(clearReplyingTo());
+    };
+
+    useEffect(() => {
+        if (replyingTo.message && replyingTo.target === currentName && !text) {
+            const mention = `@${replyingTo.message.name} `;
+            setText(mention);
+            inputRef.current?.focus();
+        }
+    }, [replyingTo, currentName, text]);
 
     // ... (Các hàm khác giữ nguyên: handleEmojiSelect, handleGifSelect, handleImageSelect...)
     const handleEmojiSelect = (shortcode: string) => {
@@ -151,6 +175,11 @@ export default function ChatInput() {
 
     return (
         <div className="relative">
+            {/* Reply Preview */}
+            {replyingTo.message && replyingTo.target === currentName && (
+                <ReplyPreview message={replyingTo.message} onClose={handleCancelReply} />
+            )}
+
             {showToolbar && <MarkdownToolbar editorRef={inputRef} />}
 
             <div className="h-[60px] border-t border-gray-300 dark:border-gray-700 flex items-center px-4 bg-white dark:bg-gray-800">

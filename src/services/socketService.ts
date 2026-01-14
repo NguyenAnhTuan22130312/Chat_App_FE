@@ -6,10 +6,11 @@ import {
     socketDisconnected,
     socketConnectionError
 } from "../store/slices/authSlice";
-import {addMessage, ChatMessage, clearMessages, setMessages, addHistoryMessages} from "../store/slices/chatSlice";
+import {addMessage, ChatMessage, setMessages, addHistoryMessages} from "../store/slices/chatSlice";
 import {store} from "../store/store";
 import {ChatPartner, setPartners, updatePartnerOnline} from "../store/slices/chatPartnerSlice";
 import {increaseUnread} from "../store/slices/unreadSlice";
+import { parseReplyMessage } from "../utils/replyUtils";
 
 
 const SOCKET_URL = 'wss://chat.longapp.site/chat/chat';
@@ -142,7 +143,17 @@ class SocketService {
                         const lastMsg = responseData[0];
                         const partnerName = lastMsg.name === myUsername ? lastMsg.to : lastMsg.name;
 
-                        const history = [...responseData].reverse();
+                        const history = [...responseData]
+                            .filter((msg: any) => !this.isWebRTCSignal(msg.mes))
+                            .reverse()
+                            .map((msg: any) => {
+                                const { replyTo, mes: parsedMessage } = parseReplyMessage(msg.mes);
+                                return {
+                                    ...msg,
+                                    mes: parsedMessage,
+                                    replyTo: replyTo || undefined,
+                                };
+                            });
 
                         const currentMsgs = store.getState().chat.messagesByTarget[partnerName];
 
@@ -172,7 +183,17 @@ class SocketService {
                     if (responseData && responseData.name) {
                         const roomName = responseData.name;
                         const chatData = responseData.chatData || [];
-                        const history = [...chatData].reverse();
+                        const history = [...chatData]
+                            .filter((msg: any) => !this.isWebRTCSignal(msg.mes))
+                            .reverse()
+                            .map((msg: any) => {
+                                const { replyTo, mes: parsedMessage } = parseReplyMessage(msg.mes);
+                                return {
+                                    ...msg,
+                                    mes: parsedMessage,
+                                    replyTo: replyTo || undefined,
+                                };
+                            });
 
                         const currentMsgs = store.getState().chat.messagesByTarget[roomName];
 
@@ -199,7 +220,7 @@ class SocketService {
                             if (this.onWebRTCSignal && senderName !== myUsername) {
                                 this.onWebRTCSignal(senderName, signalPayload);
                             }
-                            break; 
+                            break;
                         }
 
                         if (!to || !senderName) {
@@ -215,12 +236,15 @@ class SocketService {
                             target = senderName === myUsername ? to : senderName;
                         }
 
+                        const { replyTo, mes: parsedMessage } = parseReplyMessage(mes);
+
                         const newMessage: ChatMessage = {
                             name: senderName,
                             to: to,
-                            mes: mes,
+                            mes: parsedMessage,
                             type: messageType,
-                            createAt: createAt || new Date().toISOString()
+                            createAt: createAt || new Date().toISOString(),
+                            replyTo: replyTo || undefined,
                         };
 
                         store.dispatch(addMessage({

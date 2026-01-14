@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState, useLayoutEffect } from 'react';
+import React, { useEffect, useRef, useState, useLayoutEffect, useMemo } from 'react';
 import ChatHeader from './ChatHeader';
 import MessageItem from './MessageItem';
 import ChatInput from './ChatInput';
@@ -22,7 +22,9 @@ export default function ChatWindow() {
    const myUsername = user?.username;
    const messagesByTarget = useAppSelector((state) => state.chat.messagesByTarget);
    const { name: currentChatName, type: currentChatType } = useAppSelector((state) => state.currentChat);
-   const messages = currentChatName ? (messagesByTarget[currentChatName] || []) : [];
+   const messages = useMemo(() => {
+       return currentChatName ? (messagesByTarget[currentChatName] || []) : [];
+   }, [currentChatName, messagesByTarget]);
 
 
    // --- REFS ---
@@ -134,7 +136,7 @@ export default function ChatWindow() {
 
            setIsLoadingMore(false);
        }
-   }, [messages]);
+   }, [messages, isLoadingMore]);
 
 
    // 4. AUTO SCROLL BOTTOM
@@ -193,7 +195,16 @@ export default function ChatWindow() {
                )}
 
 
-               {messages.map((msg, index) => {
+                {messages
+                    .filter(msg => {
+                        try {
+                            const parsed = JSON.parse(msg.mes);
+                            return parsed.type !== 'WEBRTC_SIGNAL';
+                        } catch {
+                            return true;
+                        }
+                    })
+                    .map((msg, index) => {
                    const isMe = msg.name === myUsername;
                    const prevMsg = messages[index - 1];
                    const nextMsg = messages[index + 1];
