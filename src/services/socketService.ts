@@ -324,7 +324,7 @@ class SocketService {
                             addGroupToFirebase(myUsername, newRoomName);
                         }
                     } else {
-                        console.error("Lỗi tạo phòng:"|| "Unknown error");
+                        console.error("Lỗi tạo phòng:", "Unknown error");
                     }
                     break;
                 case 'JOIN_ROOM':

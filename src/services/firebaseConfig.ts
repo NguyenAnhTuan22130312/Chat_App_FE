@@ -40,10 +40,10 @@ const getChatKey = (user1: string, user2: string) => {
     return [user1, user2].sort().join('_'); 
 };
 
-export const savePinnedMessageToFirebase = (currentUser: string, targetUser: string, message: any) => {   
-    const chatKey = message.type === 'room' ? targetUser : getChatKey(currentUser, targetUser);
-    const pinRef = ref(database, `pins/${chatKey}`);
+export const savePinnedMessageToFirebase = (currentUser: string, targetUser: string, message: any, type: 'room' | 'people') => {   
+    const chatKey = type === 'room' ? targetUser : getChatKey(currentUser, targetUser);
     
+    const pinRef = ref(database, `pins/${chatKey}`);
     set(pinRef, message).catch(err => console.error("Lỗi ghim tin nhắn:", err));
 };
 
