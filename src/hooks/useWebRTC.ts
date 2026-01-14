@@ -23,6 +23,9 @@ export const useWebRTC = (currentPartner: string) => {
    const { user } = useAppSelector(state => state.auth);
    const chatType = useAppSelector(state => state.currentChat.type) || 'people';
 
+   const candidateQueue = useRef<RTCIceCandidate[]>([]);
+   const sendingTimeout = useRef<NodeJS.Timeout | null>(null);
+
 
    const createPeerConnection = useCallback(() => {
        if (peerConnection.current) return peerConnection.current;
@@ -33,10 +36,19 @@ export const useWebRTC = (currentPartner: string) => {
 
        pc.onicecandidate = (event) => {
            if (event.candidate) {
-               socketService.sendWebRTCSignal(currentPartner, {
-                   type: 'CANDIDATE',
-                   candidate: event.candidate
-               },chatType);
+            candidateQueue.current.push(event.candidate);
+            if (sendingTimeout.current) clearTimeout(sendingTimeout.current);
+            sendingTimeout.current = setTimeout(() => {
+                if (candidateQueue.current.length > 0) {
+                    candidateQueue.current.forEach(cand => {
+                        socketService.sendWebRTCSignal(currentPartner, {
+                            type: 'CANDIDATE',
+                            candidate: cand
+                        }, chatType);
+                    });
+                    candidateQueue.current = []; 
+                }
+            }, 100);
            }
        };
 
