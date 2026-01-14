@@ -68,7 +68,7 @@ export default function ChatWindow() {
            if (loadSafetyTimerRef.current) clearTimeout(loadSafetyTimerRef.current);
 
 
-           dispatch(setMessages({ target: currentChatName, messages: [] }));
+           // dispatch(setMessages({ target: currentChatName, messages: [] }));
 
 
            const timer = setTimeout(() => {

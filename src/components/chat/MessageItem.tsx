@@ -27,7 +27,7 @@ const MessageItem = memo(({
 
     const handlePin = () => {
         if (currentChatName && user?.username) {
-            savePinnedMessageToFirebase(user.username, currentChatName, msg);
+            savePinnedMessageToFirebase(user.username, currentChatName, msg,chatType);
         }
     };
 
