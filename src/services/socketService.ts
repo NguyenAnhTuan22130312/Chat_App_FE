@@ -20,7 +20,7 @@ const HEARTBEAT_INTERVAL = 30000;
 const RECONNECT_DELAY = 3000;
 const MAX_RECONNECT_ATTEMPTS = 5;
 
-type WebRTCSignalCallback = (sender: string, data: any) => void;
+type WebRTCSignalCallback = (sender: string, data: any, target: string) => void;
 
 // const CHAT_WHITELIST = [
 //     '22130302', 'trunghan', 'anhtuan12', 'hantr', 'long','AnhTuan11','Qte','tuanroomtest','tuantest',
@@ -53,8 +53,6 @@ class SocketService {
     }
 
     private isWhitelisted(name: string): boolean {
-        // Luôn cho phép chính mình hoặc các bot hệ thống (nếu có)
-        // Ví dụ: return this.whitelist.includes(name) || name === 'System';
         return this.whitelist.includes(name);
     }
 
@@ -62,20 +60,35 @@ class SocketService {
         this.onWebRTCSignal = callback;
     }
 
-    public sendWebRTCSignal(toUser: string, data: any) {
+    public sendWebRTCSignal(target: string, data: any, type: 'people' | 'room' = 'people') {
         const signalMessage = JSON.stringify({
             type: 'WEBRTC_SIGNAL',
             payload: data
         });
-        this.sendMessageToPeople(toUser, signalMessage);
+        if (type === 'room') {
+            this.sendMessageToRoom(target, signalMessage);
+        } else {
+            this.sendMessageToPeople(target, signalMessage);
+        }
     }
 
-    private isWebRTCSignal(mes: string): any | null {
+    private isWebRTCSignal(mes: any): any | null {
         try {
-            if (!mes.startsWith('{')) return null;
-            const parsed = JSON.parse(mes);
-            if (parsed && parsed.type === 'WEBRTC_SIGNAL') {
-                return parsed.payload;
+            if (typeof mes === 'object' && mes !== null) {
+                if (mes.type === 'WEBRTC_SIGNAL') {
+                    return mes.payload;
+                }
+                return null;
+            }
+
+            if (typeof mes === 'string') {
+                const cleaned = mes.trim();
+                if (cleaned.startsWith('{')) {
+                    const parsed = JSON.parse(cleaned);
+                    if (parsed && parsed.type === 'WEBRTC_SIGNAL') {
+                        return parsed.payload;
+                    }
+                }
             }
         } catch (e) {
             return null;
@@ -240,7 +253,7 @@ class SocketService {
                         const signalPayload = this.isWebRTCSignal(mes);
                         if (signalPayload) {
                             if (this.onWebRTCSignal && senderName !== myUsername) {
-                                this.onWebRTCSignal(senderName, signalPayload);
+                                this.onWebRTCSignal(senderName, signalPayload, to);
                             }
                             break;
                         }

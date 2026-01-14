@@ -21,7 +21,6 @@ const ContactMenu = () => {
     return (
         <div className="px-4 space-y-2 pt-2 animate-in fade-in duration-300">
             <p className="text-xs font-bold text-gray-400 uppercase tracking-wider mb-3 px-2">Danh bạ</p>
-            {/* Bạn có thể tách cái ContactMenuItem ra component riêng như bài trước để code gọn hơn */}
             <div className="flex items-center gap-4 p-3 rounded-2xl hover:bg-gray-100 dark:hover:bg-gray-800 cursor-pointer transition-all">
                 <div className="w-10 h-10 rounded-full bg-blue-500 text-white flex items-center justify-center">
                     <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" /></svg>

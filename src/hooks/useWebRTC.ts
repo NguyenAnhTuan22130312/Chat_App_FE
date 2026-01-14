@@ -21,6 +21,10 @@ export const useWebRTC = (currentPartner: string) => {
 
    const peerConnection = useRef<RTCPeerConnection | null>(null);
    const { user } = useAppSelector(state => state.auth);
+   const chatType = useAppSelector(state => state.currentChat.type) || 'people';
+
+   const candidateQueue = useRef<RTCIceCandidate[]>([]);
+   const sendingTimeout = useRef<NodeJS.Timeout | null>(null);
 
 
    const createPeerConnection = useCallback(() => {
@@ -32,10 +36,19 @@ export const useWebRTC = (currentPartner: string) => {
 
        pc.onicecandidate = (event) => {
            if (event.candidate) {
-               socketService.sendWebRTCSignal(currentPartner, {
-                   type: 'CANDIDATE',
-                   candidate: event.candidate
-               });
+            candidateQueue.current.push(event.candidate);
+            if (sendingTimeout.current) clearTimeout(sendingTimeout.current);
+            sendingTimeout.current = setTimeout(() => {
+                if (candidateQueue.current.length > 0) {
+                    candidateQueue.current.forEach(cand => {
+                        socketService.sendWebRTCSignal(currentPartner, {
+                            type: 'CANDIDATE',
+                            candidate: cand
+                        }, chatType);
+                    });
+                    candidateQueue.current = []; 
+                }
+            }, 100);
            }
        };
 
@@ -59,14 +72,18 @@ export const useWebRTC = (currentPartner: string) => {
 
        peerConnection.current = pc;
        return pc;
-   }, [currentPartner]);
+   }, [currentPartner,chatType]);
 
 
    // 2. Lắng nghe tín hiệu từ SocketService
    useEffect(() => {
-       socketService.registerWebRTCListener(async (sender, payload) => {
-           // Chỉ nhận tín hiệu từ người đang chat cùng
-           if (sender !== currentPartner) return;
+       socketService.registerWebRTCListener(async (sender, payload,target) => {
+           
+            if (chatType === 'people') {
+                if (sender !== currentPartner) return;
+            } else if (chatType === 'room') {
+                if (target !== currentPartner) return;
+            }
 
 
            if (!peerConnection.current && payload.type !== 'OFFER') return;
@@ -108,7 +125,7 @@ export const useWebRTC = (currentPartner: string) => {
 
        return () => {
        };
-   }, [currentPartner, createPeerConnection]);
+   }, [currentPartner, createPeerConnection,chatType]);
 
 
 
@@ -149,7 +166,7 @@ export const useWebRTC = (currentPartner: string) => {
        socketService.sendWebRTCSignal(currentPartner, {
            type: 'OFFER',
            offer: offer
-       });
+       },chatType);
    };
 
 
@@ -180,7 +197,7 @@ export const useWebRTC = (currentPartner: string) => {
        socketService.sendWebRTCSignal(currentPartner, {
            type: 'ANSWER',
            answer: answer
-       });
+       },chatType);
    };
 
 
@@ -201,7 +218,7 @@ export const useWebRTC = (currentPartner: string) => {
 
 
        // Gửi tín hiệu kết thúc cho bên kia
-       socketService.sendWebRTCSignal(currentPartner, { type: 'END_CALL' });
+       socketService.sendWebRTCSignal(currentPartner, { type: 'END_CALL' },chatType);
    };
 
 
