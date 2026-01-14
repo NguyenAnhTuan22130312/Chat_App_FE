@@ -10,6 +10,8 @@ import {addMessage, ChatMessage, clearMessages, setMessages, addHistoryMessages}
 import {store} from "../store/store";
 import {ChatPartner, setPartners, updatePartnerOnline} from "../store/slices/chatPartnerSlice";
 import {increaseUnread} from "../store/slices/unreadSlice";
+import {startSearching, setSearchResult, clearSearch} from "../store/slices/searchSlice";
+import {addGroupToFirebase} from "./friendService";
 
 
 const SOCKET_URL = 'wss://chat.longapp.site/chat/chat';
@@ -19,10 +21,10 @@ const MAX_RECONNECT_ATTEMPTS = 5;
 
 type WebRTCSignalCallback = (sender: string, data: any) => void;
 
-const CHAT_WHITELIST = [
-    '22130302', 'trunghan', 'anhtuan12', 'hantr', 'long','AnhTuan11','Qte','tuanroomtest','tuantest',
-    '22130312_anhtuan', '22130302_hantrung', '22130311_NguyenAnhTuan', 'Nhom_63'
-];
+// const CHAT_WHITELIST = [
+//     '22130302', 'trunghan', 'anhtuan12', 'hantr', 'long','AnhTuan11','Qte','tuanroomtest','tuantest',
+//     '22130312_anhtuan', '22130302_hantrung', '22130311_NguyenAnhTuan', 'Nhom_63'
+// ];
 
 class SocketService {
     private socket: WebSocket | null = null;
@@ -34,6 +36,26 @@ class SocketService {
     private reconnectAttempts: number = 0;
     private checkOnlineQueue: string[] = [];
     private onWebRTCSignal: WebRTCSignalCallback | null = null;
+
+
+    private whitelist: string[] = [];
+
+    public setWhitelist(friends: string[], groups: string[]) {
+        // Gộp 2 mảng lại và lọc trùng (Set)
+        this.whitelist = Array.from(new Set([...friends, ...groups]));
+        console.log("🔒 Socket Whitelist Updated:", this.whitelist);
+
+        // Sau khi update whitelist, nên gọi lại hàm lấy user để làm mới danh sách hiển thị
+        if (this.socket && this.socket.readyState === WebSocket.OPEN) {
+            this.getUserList();
+        }
+    }
+
+    private isWhitelisted(name: string): boolean {
+        // Luôn cho phép chính mình hoặc các bot hệ thống (nếu có)
+        // Ví dụ: return this.whitelist.includes(name) || name === 'System';
+        return this.whitelist.includes(name);
+    }
 
     public registerWebRTCListener(callback: WebRTCSignalCallback) {
         this.onWebRTCSignal = callback;
@@ -251,11 +273,10 @@ class SocketService {
                         }));
 
                         let partnersToProcess: ChatPartner[] = [];
-
                         if (IS_STRESS_TEST_MODE) {
                             partnersToProcess = allPartners;
                         } else {
-                            partnersToProcess = allPartners.filter(p => CHAT_WHITELIST.includes(p.name));
+                            partnersToProcess = allPartners.filter(p => this.whitelist.includes(p.name));
                         }
 
                         partnersToProcess.sort((a, b) => {
@@ -282,7 +303,30 @@ class SocketService {
                         });
                     }
                     break;
+
+                case 'CHECK_USER_EXIST':
+                    // responseData mẫu: { status: true }
+                    if (responseData) {
+                        const exists = responseData.status === true;
+                        console.log("🔍 Check User Result:", exists);
+
+                        // Bắn kết quả về Redux -> UI sẽ tự cập nhật
+                        store.dispatch(setSearchResult(exists));
+                    }
+                    break;
                 case 'CREATE_ROOM':
+                    // Check status success từ server
+                    if (status === 'success' && responseData) {
+                        const newRoomName = responseData.name;
+                        const myUsername = store.getState().auth.user?.username;
+                        console.log(" Server created room:", newRoomName);
+                        if (myUsername && newRoomName) {
+                            addGroupToFirebase(myUsername, newRoomName);
+                        }
+                    } else {
+                        console.error("Lỗi tạo phòng:"|| "Unknown error");
+                    }
+                    break;
                 case 'JOIN_ROOM':
                     this.getUserList();
                     break;
@@ -365,9 +409,10 @@ class SocketService {
         this.send({event: 'LOGOUT'});
     }
 
-    sendMessageToPeople(toUser: string, message: string) {
+    public sendMessageToPeople(toUser: string, message: string) {
         this.send({event: 'SEND_CHAT', data: {type: 'people', to: toUser, mes: message}});
     }
+
 
     public getHistory(partnerName: string, page: number = 1) {
         console.log(`Requesting history for ${partnerName} - Page: ${page}`);
@@ -394,8 +439,16 @@ class SocketService {
         this.send({event: 'JOIN_ROOM', data: {name: roomName}});
     }
 
-    checkUserExist(username: string) {
-        this.send({event: 'CHECK_USER_EXIST', data: {user: username}});
+    public checkUserExist(username: string) {
+        store.dispatch(startSearching(username));
+
+        // Gửi request lên server
+        this.send({
+            event: 'CHECK_USER_EXIST',
+            data: {
+                user: username
+            }
+        });
     }
 
     checkUserOnline(username: string) {

@@ -13,6 +13,7 @@ import Profile from './screens/Profile';
 import ChatList from "./components/sidebar/ChatList";
 import ContactWindow from './components/contact/ContactWindow';
 import HomeLayout from "./components/Layout/HomeLayout";
+import {useFirebaseLists} from "./hooks/useFirebaseLists";
 
 
 // Component hiển thị danh sách các mục trong danh bạ (Button)
@@ -200,6 +201,15 @@ function App() {
     const socketConnectionError = useAppSelector((state) => state.auth.socketConnectionError);
     const themeMode = useAppSelector((state) => state.theme.mode);
     const dispatch = useAppDispatch();
+
+    const user = useAppSelector((state) => state.auth.user); // Lấy user để lấy username
+    const { friends, groups } = useFirebaseLists(user?.username);
+    useEffect(() => {
+        if (isAuthenticated && user?.username) {
+            socketService.setWhitelist(friends, groups);
+        }
+    }, [friends, groups, isAuthenticated, user]);
+
 
     // Thêm chế độ dark mode
     useEffect(() => {

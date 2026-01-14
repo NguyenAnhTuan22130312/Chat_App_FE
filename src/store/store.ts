@@ -3,10 +3,10 @@ import authReducer from './slices/authSlice';
 import chatPartnerReducer from './slices/chatPartnerSlice';
 import chatReducer from './slices/chatSlice';
 import currentChatReducer from './slices/currentChatSlice'
-// import lastMessageReducer from './slices/lastMessageSlice';
 import unreadReducer from './slices/unreadSlice';
 import themeReducer from './slices/themeSlice';
 import uiReducer from './slices/uiSlice';
+import searchReducer from './slices/searchSlice';
 
 export const store = configureStore({
     reducer: {
@@ -18,6 +18,7 @@ export const store = configureStore({
         unread: unreadReducer,
         theme: themeReducer,
         ui: uiReducer,
+        search: searchReducer,
     },
 });
 
