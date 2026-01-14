@@ -40,12 +40,31 @@ const getChatKey = (user1: string, user2: string) => {
     return [user1, user2].sort().join('_'); 
 };
 
-export const savePinnedMessageToFirebase = (currentUser: string, targetUser: string, message: any, type: 'room' | 'people') => {   
+export const savePinnedMessageToFirebase = (
+    currentUser: string,
+    targetUser: string,
+    message: any,
+    type: 'room' | 'people'
+  ) => {   
     const chatKey = type === 'room' ? targetUser : getChatKey(currentUser, targetUser);
-    
     const pinRef = ref(database, `pins/${chatKey}`);
-    set(pinRef, message).catch(err => console.error("Lỗi ghim tin nhắn:", err));
-};
+  
+    const safeMessage = {   
+      messageId: message.messageId 
+        || `${message.name}_${message.createAt}`,
+      mes: message.mes,
+      name: message.name,
+      createAt: message.createAt,
+      type: message.type,
+      to: message.to,
+      replyTo: message.replyTo ?? null
+    };
+  
+    set(pinRef, safeMessage)
+      .catch(err => console.error("Lỗi ghim:", err));
+  };
+  
+  
 
 export const removePinnedMessageFromFirebase = (currentUser: string, targetUser: string, type: 'room' | 'people') => {
     const chatKey = type === 'room' ? targetUser : getChatKey(currentUser, targetUser);
