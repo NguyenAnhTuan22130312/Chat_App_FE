@@ -6,6 +6,7 @@ import currentChatReducer from './slices/currentChatSlice'
 // import lastMessageReducer from './slices/lastMessageSlice';
 import unreadReducer from './slices/unreadSlice';
 import themeReducer from './slices/themeSlice';
+import uiReducer from './slices/uiSlice';
 
 export const store = configureStore({
     reducer: {
@@ -16,6 +17,7 @@ export const store = configureStore({
         // lastMessage: lastMessageReducer,
         unread: unreadReducer,
         theme: themeReducer,
+        ui: uiReducer,
     },
 });
 
