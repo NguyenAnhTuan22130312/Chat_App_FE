@@ -20,6 +20,10 @@ export default function ChatInput() {
     const fileInputRef = useRef<HTMLInputElement>(null);
     const inputRef = useRef<HTMLDivElement>(null);
 
+    const [isRecording, setIsRecording] = useState(false);
+    const mediaRecorderRef = useRef<MediaRecorder | null>(null);
+    const audioChunksRef = useRef<Blob[]>([]);
+
     const { name: currentName, type: currentType } = useAppSelector(state => state.currentChat);
     const { user } = useAppSelector((state) => state.auth);
     // Lấy danh sách partners để kiểm tra tên có tồn tại không
@@ -28,31 +32,15 @@ export default function ChatInput() {
 
     const dispatch = useAppDispatch();
 
-    // --- HÀM MỚI: XỬ LÝ TAG NAME ---
     const processMentions = (rawContent: string) => {
-        // 1. Tạo danh sách whitelist (các username hợp lệ)
-        // (Lấy từ partners và chỉ lấy type 'people')
         const validUsernames = partners
             .filter(p => p.type === 'people')
-            .map(p => p.name);
-
-        // 2. Regex tìm kiếm:
-        // (^|\s)           -> Bắt đầu dòng HOẶC khoảng trắng (để tránh email hoặc @@ dính chùm)
-        // @                -> Ký tự @
-        // ([a-zA-Z0-9_]+)  -> Group bắt tên (chữ, số, gạch dưới)
-        // (?=\s|$|[.,!?])  -> Kết thúc bằng khoảng trắng, hết dòng hoặc dấu câu (Optional)
+            .map(p => p.name)
 
         return rawContent.replace(/(^|\s)@([a-zA-Z0-9_]+)/g, (match, prefix, name) => {
-            // match: chuỗi tìm thấy (vd: " @trunghan")
-            // prefix: ký tự đầu (khoảng trắng hoặc rỗng)
-            // name: tên user (vd: "trunghan")
-
             if (validUsernames.includes(name)) {
-                // Nếu tên có trong danh sách -> Format Đậm + Nghiêng (***text***)
                 return `${prefix}***@${name}***`;
             }
-
-            // Nếu không trùng tên ai (hoặc lỗi @@) -> Giữ nguyên
             return match;
         });
     };
@@ -61,13 +49,16 @@ export default function ChatInput() {
         if (!currentName || !currentType) return;
 
         let formattedContent = processMentions(content);
+        if (content.startsWith('http')) {
+            formattedContent = content;
+       }
         if (replyingTo.message && replyingTo.target === currentName) {
             formattedContent = formatReplyMessage(replyingTo.message, formattedContent);
         }
 
         const tempMessage = {
             name: user?.username || 'me',
-            mes: formattedContent, // Dùng nội dung đã format
+            mes: formattedContent,
             type: currentType,
             to: currentName,
             createAt: new Date().toISOString(),
@@ -87,7 +78,7 @@ export default function ChatInput() {
             await socketService.connect();
 
             if (currentType === 'room') {
-                socketService.sendMessageToRoom(currentName, formattedContent); // Gửi nội dung đã format lên server
+                socketService.sendMessageToRoom(currentName, formattedContent);
             } else {
                 socketService.sendMessageToPeople(currentName, formattedContent);
             }
@@ -108,6 +99,68 @@ export default function ChatInput() {
         dispatch(clearReplyingTo());
     };
 
+    const startRecording = async () => {
+        try {
+            const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+            const mediaRecorder = new MediaRecorder(stream);
+            mediaRecorderRef.current = mediaRecorder;
+            audioChunksRef.current = [];
+
+            mediaRecorder.ondataavailable = (event) => {
+                if (event.data.size > 0) {
+                    audioChunksRef.current.push(event.data);
+                }
+            };
+
+            mediaRecorder.onstop = async () => {
+                const audioBlob = new Blob(audioChunksRef.current, { type: 'audio/webm' }); 
+                await handleUploadAudio(audioBlob);
+                stream.getTracks().forEach(track => track.stop());
+            };
+
+            mediaRecorder.start();
+            setIsRecording(true);
+        } catch (error) {
+            console.error("Lỗi truy cập micro:", error);
+            alert("Không thể truy cập Micro. Vui lòng cấp quyền!");
+        }
+    };
+
+    const stopRecording = () => {
+        if (mediaRecorderRef.current && isRecording) {
+            mediaRecorderRef.current.stop();
+            setIsRecording(false);
+        }
+    };
+
+    const handleUploadAudio = async (audioBlob: Blob) => {
+        if (!currentName) return;
+        setIsUploading(true);
+
+        const formData = new FormData();
+        formData.append("file", audioBlob);
+        formData.append("upload_preset", UPLOAD_PRESET);
+        formData.append("resource_type", "auto"); 
+
+        try {
+            const res = await fetch(`https://api.cloudinary.com/v1_1/${CLOUD_NAME}/upload`, {
+                method: "POST",
+                body: formData,
+            });
+            const data = await res.json();
+            
+            if (data.secure_url) {
+                // SỬA: Gọi hàm sendMessage để vừa hiện lên UI vừa gửi đi
+                sendMessage(data.secure_url);
+            }
+        } catch (error) {
+            console.error("Lỗi upload audio:", error);
+            alert("Lỗi gửi tin nhắn thoại.");
+        } finally {
+            setIsUploading(false);
+        }
+    };
+
     useEffect(() => {
         if (replyingTo.message && replyingTo.target === currentName && !text) {
             const mention = `@${replyingTo.message.name} `;
@@ -116,7 +169,6 @@ export default function ChatInput() {
         }
     }, [replyingTo, currentName, text]);
 
-    // ... (Các hàm khác giữ nguyên: handleEmojiSelect, handleGifSelect, handleImageSelect...)
     const handleEmojiSelect = (shortcode: string) => {
         setText(prev => prev + shortcode + ' ');
         inputRef.current?.focus();
@@ -219,6 +271,32 @@ export default function ChatInput() {
                             </svg>
                         )}
                     </div>
+                    <button
+                        className={`cursor-pointer transition-colors ${
+                            isRecording 
+                            ? 'text-red-500 animate-pulse bg-red-100 dark:bg-red-900/30 rounded-full p-1' 
+                            : 'hover:text-red-500 dark:hover:text-red-400'
+                        } ${isDisabled ? 'opacity-50 pointer-events-none' : ''}`}
+                        onMouseDown={startRecording}
+                        onMouseUp={stopRecording}
+                        onMouseLeave={stopRecording}
+                        onTouchStart={startRecording}
+                        onTouchEnd={stopRecording}
+                        title="Nhấn giữ để ghi âm"
+                        type="button"
+                    >
+                         {isRecording ? (
+                              <svg className="w-6 h-6" fill="currentColor" viewBox="0 0 24 24">
+                                   <path d="M12 14c1.66 0 3-1.34 3-3V5c0-1.66-1.34-3-3-3S9 3.34 9 5v6c0 1.66 1.34 3 3 3z"/>
+                                   <path d="M17 11c0 2.76-2.24 5-5 5s-5-2.24-5-5H5c0 3.53 2.61 6.43 6 6.92V21h2v-3.08c3.39-.49 6-3.39 6-6.92h-2z"/>
+                              </svg>
+                         ) : (
+                              <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 11a7 7 0 01-7 7m0 0a7 7 0 01-7-7m7 7v4m0 0H8m4 0h4m-4-8a3 3 0 01-3-3V5a3 3 0 116 0v6a3 3 0 01-3 3z" />
+                              </svg>
+                         )}
+                    </button>
+
                 </div>
 
                 <div className="flex-1 relative flex items-center">

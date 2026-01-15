@@ -35,14 +35,23 @@ const MessageBubble = ({text, isMe, avatar, timestamp, senderName, replyTo, onRe
             url.includes('giphy.com') ||
             url.includes('blob:')
         );
+        // Loại trừ nếu nó là audio/video
+        if (/\.(mp4|webm|mp3|wav|ogg|m4a)$/i.test(url)) return false;
 
         return hasImageExtension || isKnownImageHost;
     };
 
-    const parseMessage = (text: string) => {
+    const isAudioUrl = (url: string) => {
+        if (!url || !url.startsWith('http')) return false;
+        return /\.(mp3|wav|ogg|webm|m4a)$/i.test(url) || url.includes('/video/upload/'); 
+    };
 
+    const parseMessage = (text: string) => {
         if (isImageUrl(text)) {
             return {type: 'image', content: text};
+        }
+        if (isAudioUrl(text)) {
+            return {type: 'audio', content: text};
         }
 
         const hasMarkdown = /\*\*|\*|__/.test(text);
@@ -51,10 +60,7 @@ const MessageBubble = ({text, isMe, avatar, timestamp, senderName, replyTo, onRe
 
         if (hasMarkdown || hasEmoji || hasColor) {
             let parsed = text;
-
-            // chuyển đổi emoji shortcode thành emoji
             parsed = replaceEmojiShortcodes(parsed);
-
             return {type: 'markdown', content: parsed};
         }
 
@@ -69,13 +75,8 @@ const MessageBubble = ({text, isMe, avatar, timestamp, senderName, replyTo, onRe
             html = html.replace(regex, `<span style="color:${hex}">$1</span>`);
         });
 
-        // Bold: **text**
         html = html.replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>');
-
-        // Italic: *text*
         html = html.replace(/\*(.+?)\*/g, '<em>$1</em>');
-
-        // Underline: __text__
         html = html.replace(/__(.+?)__/g, '<u>$1</u>');
 
         return <span dangerouslySetInnerHTML={{__html: html}} className="whitespace-pre-wrap"/>;
@@ -83,18 +84,23 @@ const MessageBubble = ({text, isMe, avatar, timestamp, senderName, replyTo, onRe
 
     const message = parseMessage(actualText);
     const isImage = message.type === 'image';
+    const isAudio = message.type === 'audio';
+    const bubbleStyle = isImage 
+        ? 'p-0 bg-transparent' 
+        : isAudio
+            ? `p-1.5 ${isMe ? 'bg-[#0084ff]' : 'bg-[#f0f2f5] dark:bg-gray-700'} rounded-2xl`
+            : isMe
+                ? 'px-3 py-2 bg-[#0084ff] text-white rounded-2xl rounded-tr-md'
+                : 'px-3 py-2 bg-[#e4e6eb] dark:bg-gray-700 text-black dark:text-white rounded-2xl rounded-tl-md';
 
     return (
-
         <div 
             className={`flex items-end mb-1 ${isMe ? 'justify-end' : 'justify-start'} group relative`}
             onMouseEnter={() => setShowActions(true)}
             onMouseLeave={() => setShowActions(false)}
         >
-
             {!isMe && (
                 <div className="w-8 h-8 mr-2 shrink-0 flex items-start">
-
                     {avatar ? (
                         <img
                             src={avatar || "https://via.placeholder.com/32"}
@@ -108,24 +114,15 @@ const MessageBubble = ({text, isMe, avatar, timestamp, senderName, replyTo, onRe
             )}
 
             <div className={`flex flex-col max-w-[70%] ${isMe ? 'items-end' : 'items-start'}`}>
-            
                 {senderName && (
                     <span className="text-[11px] text-gray-500 dark:text-gray-400 ml-1 mb-1 font-medium select-none">
                         {senderName}
                     </span>
                 )}
-                <div
-                    className={`
-                        relative z-10 pointer-events-auto text-[15px] leading-relaxed break-words overflow-hidden
-                        ${isImage ? 'p-0 bg-transparent' : (
-                        isMe
-                            ? 'px-3 py-2 bg-[#0084ff] text-white rounded-2xl rounded-tr-md' 
-                            : 'px-3 py-2 bg-[#e4e6eb] dark:bg-gray-700 text-black dark:text-white rounded-2xl rounded-tl-md'
-                    )}
-                    `}
-                >
-                    {/* Quoted Message */}
-                    {parsedReplyTo && !isImage && (
+
+                <div className={`relative z-10 pointer-events-auto text-[15px] leading-relaxed break-words overflow-hidden ${bubbleStyle}`}>
+                    
+                    {parsedReplyTo && !isImage && !isAudio && (
                         <div className={`mb-2 pb-2 border-l-2 pl-2 ${
                             isMe 
                                 ? 'border-blue-200 bg-blue-500/20' 
@@ -156,6 +153,17 @@ const MessageBubble = ({text, isMe, avatar, timestamp, senderName, replyTo, onRe
                                     e.currentTarget.parentElement!.innerText = message.content;
                                 }}
                             />
+                        ) : message.type === 'audio' ? (
+                            <div className="flex items-center gap-2 min-w-[240px]">
+                                <audio 
+                                    controls 
+                                    className="w-full h-8 rounded-lg outline-none" 
+                                    style={{ height: '32px' }}
+                                >
+                                    <source src={message.content} />
+                                    Trình duyệt không hỗ trợ audio.
+                                </audio>
+                            </div>
                         ) : message.type === 'markdown' ? (
                             renderMarkdown(message.content)
                         ) : (
@@ -169,6 +177,7 @@ const MessageBubble = ({text, isMe, avatar, timestamp, senderName, replyTo, onRe
                         </div>
                     )}
                 </div>
+
                 {timestamp && isImage && (
                     <div className="text-[10px] text-gray-400 mt-1 select-none opacity-80">
                         {timestamp}
@@ -176,10 +185,8 @@ const MessageBubble = ({text, isMe, avatar, timestamp, senderName, replyTo, onRe
                 )}
             </div>
 
-            {/* Action Buttons - Hiển thị khi hover */}
             {showActions && onReply && (
                 <div className={`absolute top-0 ${isMe ? 'left-0 -translate-x-full' : 'right-0 translate-x-full'} flex items-center gap-1 px-2`}>
-                    {/* Reply Button */}
                     <button
                         onClick={onReply}
                         className="p-1.5 bg-white dark:bg-gray-800 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-full shadow-md transition-all"
@@ -190,7 +197,6 @@ const MessageBubble = ({text, isMe, avatar, timestamp, senderName, replyTo, onRe
                         </svg>
                     </button>
 
-                    {/* Pin Button */}
                     {onPin && (
                         <button
                             onClick={onPin}
@@ -204,7 +210,6 @@ const MessageBubble = ({text, isMe, avatar, timestamp, senderName, replyTo, onRe
                         </button>
                     )}
 
-                    {/* More Button */}
                     <button
                         className="p-1.5 bg-white dark:bg-gray-800 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-full shadow-md transition-all"
                         title="Thêm"
@@ -220,4 +225,3 @@ const MessageBubble = ({text, isMe, avatar, timestamp, senderName, replyTo, onRe
 };
 
 export default React.memo(MessageBubble);
-
