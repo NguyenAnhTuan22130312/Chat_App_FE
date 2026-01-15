@@ -28,6 +28,11 @@ export default function ChatInput() {
     const inputRef = useRef<HTMLDivElement>(null); // Lưu ý: RichTextInput cần forwardRef tới thẻ input/textarea thực tế
 
     const { name: currentName, type: currentType,userList} = useAppSelector(state => state.currentChat as any);
+
+    const [isRecording, setIsRecording] = useState(false);
+    const mediaRecorderRef = useRef<MediaRecorder | null>(null);
+    const audioChunksRef = useRef<Blob[]>([]);
+
     const { user } = useAppSelector((state) => state.auth);
     const { partners } = useAppSelector((state) => state.chatPartner);
     const { replyingTo } = useAppSelector((state) => state.ui);
@@ -65,8 +70,6 @@ export default function ChatInput() {
         );
     };
 
-
-// --- HELPER 2: Đặt vị trí con trỏ ---
     const setCaretIndex = (element: HTMLElement, index: number) => {
         const range = document.createRange();
         const selection = window.getSelection();
@@ -210,6 +213,7 @@ export default function ChatInput() {
         // Regex thay thế
         return rawContent.replace(/(^|\s)@([a-zA-Z0-9_]+)/g, (match, prefix, name) => {
             // Chỉ in đậm nếu tên có trong danh sách hợp lệ
+
             if (validUsernames.includes(name)) {
                 return `${prefix}***@${name}***`;
             }
@@ -221,6 +225,9 @@ export default function ChatInput() {
         if (!currentName || !currentType) return;
 
         let formattedContent = processMentions(content);
+        if (content.startsWith('http')) {
+            formattedContent = content;
+       }
         if (replyingTo.message && replyingTo.target === currentName) {
             formattedContent = formatReplyMessage(replyingTo.message, formattedContent);
         }
@@ -265,6 +272,68 @@ export default function ChatInput() {
 
     const handleCancelReply = () => {
         dispatch(clearReplyingTo());
+    };
+
+    const startRecording = async () => {
+        try {
+            const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+            const mediaRecorder = new MediaRecorder(stream);
+            mediaRecorderRef.current = mediaRecorder;
+            audioChunksRef.current = [];
+
+            mediaRecorder.ondataavailable = (event) => {
+                if (event.data.size > 0) {
+                    audioChunksRef.current.push(event.data);
+                }
+            };
+
+            mediaRecorder.onstop = async () => {
+                const audioBlob = new Blob(audioChunksRef.current, { type: 'audio/webm' }); 
+                await handleUploadAudio(audioBlob);
+                stream.getTracks().forEach(track => track.stop());
+            };
+
+            mediaRecorder.start();
+            setIsRecording(true);
+        } catch (error) {
+            console.error("Lỗi truy cập micro:", error);
+            alert("Không thể truy cập Micro. Vui lòng cấp quyền!");
+        }
+    };
+
+    const stopRecording = () => {
+        if (mediaRecorderRef.current && isRecording) {
+            mediaRecorderRef.current.stop();
+            setIsRecording(false);
+        }
+    };
+
+    const handleUploadAudio = async (audioBlob: Blob) => {
+        if (!currentName) return;
+        setIsUploading(true);
+
+        const formData = new FormData();
+        formData.append("file", audioBlob);
+        formData.append("upload_preset", UPLOAD_PRESET);
+        formData.append("resource_type", "auto"); 
+
+        try {
+            const res = await fetch(`https://api.cloudinary.com/v1_1/${CLOUD_NAME}/upload`, {
+                method: "POST",
+                body: formData,
+            });
+            const data = await res.json();
+            
+            if (data.secure_url) {
+                // SỬA: Gọi hàm sendMessage để vừa hiện lên UI vừa gửi đi
+                sendMessage(data.secure_url);
+            }
+        } catch (error) {
+            console.error("Lỗi upload audio:", error);
+            alert("Lỗi gửi tin nhắn thoại.");
+        } finally {
+            setIsUploading(false);
+        }
     };
 
     useEffect(() => {
@@ -366,6 +435,32 @@ export default function ChatInput() {
                             <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" /></svg>
                         )}
                     </div>
+                    <button
+                        className={`cursor-pointer transition-colors ${
+                            isRecording 
+                            ? 'text-red-500 animate-pulse bg-red-100 dark:bg-red-900/30 rounded-full p-1' 
+                            : 'hover:text-red-500 dark:hover:text-red-400'
+                        } ${isDisabled ? 'opacity-50 pointer-events-none' : ''}`}
+                        onMouseDown={startRecording}
+                        onMouseUp={stopRecording}
+                        onMouseLeave={stopRecording}
+                        onTouchStart={startRecording}
+                        onTouchEnd={stopRecording}
+                        title="Nhấn giữ để ghi âm"
+                        type="button"
+                    >
+                         {isRecording ? (
+                              <svg className="w-6 h-6" fill="currentColor" viewBox="0 0 24 24">
+                                   <path d="M12 14c1.66 0 3-1.34 3-3V5c0-1.66-1.34-3-3-3S9 3.34 9 5v6c0 1.66 1.34 3 3 3z"/>
+                                   <path d="M17 11c0 2.76-2.24 5-5 5s-5-2.24-5-5H5c0 3.53 2.61 6.43 6 6.92V21h2v-3.08c3.39-.49 6-3.39 6-6.92h-2z"/>
+                              </svg>
+                         ) : (
+                              <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 11a7 7 0 01-7 7m0 0a7 7 0 01-7-7m7 7v4m0 0H8m4 0h4m-4-8a3 3 0 01-3-3V5a3 3 0 116 0v6a3 3 0 01-3 3z" />
+                              </svg>
+                         )}
+                    </button>
+
                 </div>
 
                 <div className="flex-1 relative flex items-center">
