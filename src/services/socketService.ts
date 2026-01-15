@@ -13,6 +13,8 @@ import {increaseUnread} from "../store/slices/unreadSlice";
 import { parseReplyMessage } from "../utils/replyUtils";
 import {startSearching, setSearchResult, clearSearch} from "../store/slices/searchSlice";
 import {addGroupToFirebase} from "./friendService";
+import {setJoinRoomError, setJoinRoomStatus} from "../store/slices/uiSlice";
+import {setRoomMembers} from "../store/slices/currentChatSlice";
 
 
 const SOCKET_URL = 'wss://chat.longapp.site/chat/chat';
@@ -21,6 +23,8 @@ const RECONNECT_DELAY = 3000;
 const MAX_RECONNECT_ATTEMPTS = 5;
 
 type WebRTCSignalCallback = (sender: string, data: any, target: string) => void;
+
+const USE_FIREBASE_SOURCE = true;
 
 // const CHAT_WHITELIST = [
 //     '22130302', 'trunghan', 'anhtuan12', 'hantr', 'long','AnhTuan11','Qte','tuanroomtest','tuantest',
@@ -40,13 +44,17 @@ class SocketService {
 
 
     private whitelist: string[] = [];
+    private myGroupNames: Set<string> = new Set(); // Thêm cái này để biết ai là Room khi tự tạo list
 
+    // 1. CẬP NHẬT HÀM SET WHITELIST
     public setWhitelist(friends: string[], groups: string[]) {
-        // Gộp 2 mảng lại và lọc trùng (Set)
+        // Lưu lại danh sách tên nhóm để phân biệt type
+        this.myGroupNames = new Set(groups);
+
+        // Gộp chung vào whitelist
         this.whitelist = Array.from(new Set([...friends, ...groups]));
         console.log("🔒 Socket Whitelist Updated:", this.whitelist);
 
-        // Sau khi update whitelist, nên gọi lại hàm lấy user để làm mới danh sách hiển thị
         if (this.socket && this.socket.readyState === WebSocket.OPEN) {
             this.getUserList();
         }
@@ -146,12 +154,12 @@ class SocketService {
 
     private handleServerResponse(receivedData: any) {
         const payload = receivedData.action === 'onchat' ? receivedData.data : receivedData;
-        const {event, status, data: responseData} = payload;
+        const {event, status, data: responseData, mes} = payload;
         const IS_STRESS_TEST_MODE = false;
 
         const currentChatState = store.getState().currentChat;
         const myUsername = store.getState().auth.user?.username || localStorage.getItem('username');
-
+        console.log(`Socket Response [${event}]:`, status, payload);
         if (status === 'success') {
             switch (event) {
                 case 'LOGIN':
@@ -243,6 +251,10 @@ class SocketService {
                                 messages: history
                             }));
                         }
+                        if (responseData.userList && Array.isArray(responseData.userList)) {
+                            console.log("👥 Cập nhật thành viên nhóm:", responseData.userList);
+                            store.dispatch(setRoomMembers(responseData.userList));
+                        }
                     }
                     break;
 
@@ -302,26 +314,50 @@ class SocketService {
 
                 case 'GET_USER_LIST':
                     if (Array.isArray(responseData)) {
-                        let allPartners: ChatPartner[] = responseData.map((item: any) => ({
-                            name: item.name,
-                            type: (item.type === 1 ? 'room' : 'people') as 'room' | 'people',
-                            actionTime: item.actionTime,
-                            isOnline: false,
-                        }));
-
                         let partnersToProcess: ChatPartner[] = [];
-                        if (IS_STRESS_TEST_MODE) {
-                            partnersToProcess = allPartners;
+
+                        // --- LOGIC MỚI Ở ĐÂY ---
+                        if (USE_FIREBASE_SOURCE) {
+                            // CASE TRUE: Dùng Whitelist làm gốc (Bỏ qua việc server có trả về hay không)
+                            // Ta tự tạo Object ChatPartner từ whitelist
+                            partnersToProcess = this.whitelist.map(name => {
+                                // Cố gắng tìm thông tin từ server trả về để lấy actionTime (nếu có)
+                                const serverData = responseData.find((u: any) => u.name === name);
+
+                                // Xác định type: Kiểm tra trong set myGroupNames
+                                const isGroup = this.myGroupNames.has(name);
+
+                                return {
+                                    name: name,
+                                    // Nếu là group thì type room, ngược lại people
+                                    type: isGroup ? 'room' : 'people',
+                                    // Nếu server có trả về time thì lấy, ko thì lấy giờ hiện tại để đẩy lên đầu
+                                    actionTime: serverData?.actionTime || new Date().toISOString(),
+                                    isOnline: false, // Mặc định false, sẽ check sau
+                                };
+                            });
+
+                            console.log("🛡️ Chế độ Firebase Source: Đã tạo danh sách từ Whitelist:", partnersToProcess.length);
+
                         } else {
-                            console.log("🔥 Whitelist hiện tại:", this.whitelist);
-                            console.log("🔥 Server trả về:", allPartners.map(p => p.name));
+                            // CASE FALSE: Dùng Server làm gốc -> Rồi lọc (Logic cũ)
+                            let allPartners: ChatPartner[] = responseData.map((item: any) => ({
+                                name: item.name,
+                                type: (item.type === 1 ? 'room' : 'people') as 'room' | 'people',
+                                actionTime: item.actionTime,
+                                isOnline: false,
+                            }));
 
-                            // Lọc
-                            partnersToProcess = allPartners.filter(p => this.whitelist.includes(p.name));
-
-                            console.log("🔥 Sau khi lọc:", partnersToProcess.map(p => p.name));
+                            if (IS_STRESS_TEST_MODE) {
+                                partnersToProcess = allPartners;
+                            } else {
+                                partnersToProcess = allPartners.filter(p => this.whitelist.includes(p.name));
+                            }
                         }
 
+                        // --- PHẦN DƯỚI GIỮ NGUYÊN ---
+
+                        // Sắp xếp
                         partnersToProcess.sort((a, b) => {
                             if (!a.actionTime || !b.actionTime) return 0;
                             return new Date(b.actionTime).getTime() - new Date(a.actionTime).getTime();
@@ -348,12 +384,9 @@ class SocketService {
                     break;
 
                 case 'CHECK_USER_EXIST':
-                    // responseData mẫu: { status: true }
                     if (responseData) {
                         const exists = responseData.status === true;
                         console.log("🔍 Check User Result:", exists);
-
-                        // Bắn kết quả về Redux -> UI sẽ tự cập nhật
                         store.dispatch(setSearchResult(exists));
                     }
                     break;
@@ -362,7 +395,6 @@ class SocketService {
                     if (status === 'success' && responseData) {
                         const newRoomName = responseData.name;
                         const myUsername = store.getState().auth.user?.username;
-                        console.log(" Server created room:", newRoomName);
                         if (myUsername && newRoomName) {
                             addGroupToFirebase(myUsername, newRoomName);
                         }
@@ -373,10 +405,12 @@ class SocketService {
                 case 'JOIN_ROOM':
                     if (responseData && responseData.name) {
                         const joinedRoomName = responseData.name;
-                        console.log(`✅ Đã tham gia phòng: ${joinedRoomName}`);
+
                         if (myUsername) {
                             addGroupToFirebase(myUsername, joinedRoomName);
                         }
+                        store.dispatch(setJoinRoomStatus('success'));
+                        store.dispatch(setJoinRoomError(null));
                     }
                     break;
 
@@ -398,6 +432,16 @@ class SocketService {
             const errorMessage = payload.mes || 'Có lỗi xảy ra';
             console.error('Socket Error:', errorMessage);
 
+            if (event === 'JOIN_ROOM') {
+                console.error(" Join Room Error:", mes);
+                store.dispatch(setJoinRoomStatus('failed'));
+                store.dispatch(setJoinRoomError(mes || "Không tìm thấy phòng này!"));
+            }
+
+            else {
+                console.error(`Socket Error [${event}]:`, mes);
+            }
+
             if (errorMessage === 'User not Login') {
                 const user = localStorage.getItem('username');
                 const code = localStorage.getItem('reLoginCode');
@@ -407,6 +451,9 @@ class SocketService {
                 store.dispatch(loginFailure(errorMessage));
             }
         }
+
+
+
     }
 
     private startHeartbeat() {
