@@ -11,7 +11,6 @@ const RegisterForm: React.FC = () => {
     const [showPassword, setShowPassword] = useState(false);
     const [showConfirmPassword, setShowConfirmPassword] = useState(false);
 
-    // Refs cho input fields
     const usernameRef = useRef<HTMLInputElement>(null);
     const passwordRef = useRef<HTMLInputElement>(null);
     const confirmPasswordRef = useRef<HTMLInputElement>(null);
@@ -24,7 +23,6 @@ const RegisterForm: React.FC = () => {
         dispatch(clearError());
     }, [dispatch]);
 
-    // Tự động xóa error sau 5 giây
     useEffect(() => {
         if (error) {
             const timeout = setTimeout(() => {
@@ -82,7 +80,6 @@ const RegisterForm: React.FC = () => {
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
 
-        // Basic validation
         if (password !== confirmPassword) {
             alert('Mật khẩu không khớp!');
             return;
@@ -95,7 +92,6 @@ const RegisterForm: React.FC = () => {
 
         dispatch(loginRequest());
 
-        // Gọi socketService để gửi packet REGISTER
         try {
             await socketService.register(username, password);
         } catch (err: any) {
@@ -103,7 +99,6 @@ const RegisterForm: React.FC = () => {
         }
     };
 
-    // Chuyển sang field tiếp theo
     const handleUsernameKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
         if (e.key === 'Enter') {
             e.preventDefault();

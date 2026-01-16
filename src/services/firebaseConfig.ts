@@ -87,43 +87,47 @@ export const listenForPinnedMessages = (currentUser: string, targetUser: string,
 
 export const getAvatarFromFirebase = async (
     name: string,
-    type: 'user' | 'group' | 'auto' = 'auto' // Mặc định là auto để tương thích code cũ, nhưng nên truyền rõ
+    type: 'user' | 'group' | 'auto' = 'auto',
+    currentUserName?: string // Tham số thứ 3: Tên người dùng hiện tại (Optional)
 ): Promise<string | null> => {
     const safeName = sanitizeFirebaseKey(name);
-
-    // Log ra để kiểm tra xem key thực tế là gì (QUAN TRỌNG ĐỂ DEBUG)
-    console.log(`[GetAvatar] Đang tìm avatar cho: ${name} (SafeKey: ${safeName}) - Type: ${type}`);
+    let searchType = type;
 
     try {
-        // 1. Nếu type là 'user' hoặc 'auto', tìm trong users trước
-        if (type === 'user' || type === 'auto') {
-            const userRef = ref(database, 'users/' + safeName + '/avatar');
-            const userSnapshot = await get(userRef);
+        if (currentUserName && type === 'auto') {
+            const safeCurrentUser = sanitizeFirebaseKey(currentUserName);
+            const checkGroupRef = ref(database, `users/${safeCurrentUser}/groups/${safeName}`);
+            const checkSnapshot = await get(checkGroupRef);
 
-            // Nếu tìm thấy và có dữ liệu
-            if (userSnapshot.exists() && userSnapshot.val()) {
-                console.log(`-> Tìm thấy trong Users:`, userSnapshot.val());
-                return userSnapshot.val();
+            if (checkSnapshot.exists()) {
+                searchType = 'group';
+                console.log(`[SmartCheck] ${name} là Group của ${currentUserName}`);
+            } else {
+                searchType = 'user';
+                console.log(`[SmartCheck] ${name} là User/Friend của ${currentUserName}`);
             }
         }
 
-        // 2. Nếu type là 'group' hoặc 'auto', tìm trong groups
-        // Lưu ý: Nếu type='auto' và ở trên tìm thấy User rỗng, nó vẫn chạy xuống đây (đã fix logic cũ)
-        if (type === 'group' || type === 'auto') {
-            const groupRef = ref(database, 'groups/' + safeName + '/avatar');
-            const groupSnapshot = await get(groupRef);
+        if (searchType === 'user') {
+            const userSnapshot = await get(ref(database, 'users/' + safeName + '/avatar'));
+            if (userSnapshot.exists()) return userSnapshot.val();
+        }
+        else if (searchType === 'group') {
+            const groupSnapshot = await get(ref(database, 'groups/' + safeName + '/avatar'));
+            if (groupSnapshot.exists()) return groupSnapshot.val();
+        }
+        else {
+            const userSnapshot = await get(ref(database, 'users/' + safeName + '/avatar'));
+            if (userSnapshot.exists()) return userSnapshot.val();
 
-            if (groupSnapshot.exists() && groupSnapshot.val()) {
-                console.log(`-> Tìm thấy trong Groups:`, groupSnapshot.val());
-                return groupSnapshot.val();
-            }
+            const groupSnapshot = await get(ref(database, 'groups/' + safeName + '/avatar'));
+            if (groupSnapshot.exists()) return groupSnapshot.val();
         }
 
     } catch (error) {
         console.error("Lỗi lấy avatar:", error);
     }
 
-    console.warn(`-> Không tìm thấy avatar nào cho ${safeName}`);
     return null;
 };
 

@@ -85,15 +85,12 @@ const ContactWindow = () => {
         );
     };
 
-    // --- CÁC HÀM XỬ LÝ HÀNH ĐỘNG (Dùng openConfirm thay vì window.confirm) ---
-
     const handleAcceptFriend = async (target: string) => {
         if (!currentUser) return;
         try {
             await acceptFriendRequest(currentUser, target);
             socketService.sendMessageToPeople(target, "oke ban");
         } catch (error: any) {
-            // Có thể dùng Modal thông báo lỗi ở đây thay alert nếu muốn xịn hơn
             alert(error.message);
         }
     };
@@ -104,7 +101,7 @@ const ContactWindow = () => {
             "Từ chối kết bạn?",
             `Bạn có chắc chắn muốn xóa lời mời từ ${target}?`,
             () => rejectFriendRequest(currentUser, target),
-            true // Danger action
+            true
         );
     };
 
@@ -145,7 +142,6 @@ const ContactWindow = () => {
         }
     };
 
-    // --- RENDER NỘI DUNG (Giữ nguyên logic cũ, chỉ gọi hàm handle...) ---
     const renderContent = () => {
         switch (activeTab) {
             case 'friends':
@@ -184,8 +180,8 @@ const ContactWindow = () => {
                         {groupInvites.map((invite: any) => (
                             <UserCard
                                 key={invite.group}
-                                username={invite.group} // Hiển thị Tên Nhóm
-                                subText={`Người mời: ${invite.inviter}`} // Hiển thị người mời
+                                username={invite.group}
+                                subText={`Người mời: ${invite.inviter}`}
                                 actions={
                                     <>
                                         <button
@@ -283,7 +279,6 @@ const ContactWindow = () => {
                 {renderContent()}
             </div>
 
-            {/* --- RENDER MODAL --- */}
             <ConfirmModal
                 isOpen={modalConfig.isOpen}
                 title={modalConfig.title}

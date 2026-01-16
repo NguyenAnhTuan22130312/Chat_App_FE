@@ -9,20 +9,16 @@ interface ReplyPreviewProps {
 }
 
 export default function ReplyPreview({ message, onClose }: ReplyPreviewProps) {
-    // Kiểm tra xem tin nhắn có phải là hình ảnh không
     const isImage = message.mes.startsWith('http') && /\.(jpeg|jpg|gif|png|webp)$/i.test(message.mes);
-    
-    // Xử lý nội dung hiển thị
+
     const displayContent = isImage 
         ? 'Hình ảnh'
         : truncateMessage(replaceEmojiShortcodes(message.mes), 60);
 
     return (
         <div className="flex items-center gap-3 px-4 py-2 bg-gray-100 dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700">
-            {/* Left border accent */}
             <div className="w-1 h-10 bg-blue-500 rounded-full flex-shrink-0" />
-            
-            {/* Reply content */}
+
             <div className="flex-1 min-w-0">
                 <div className="flex items-center gap-2 mb-0.5">
                     <svg 
@@ -47,7 +43,6 @@ export default function ReplyPreview({ message, onClose }: ReplyPreviewProps) {
                 </p>
             </div>
 
-            {/* Close button */}
             <button
                 onClick={onClose}
                 className="flex-shrink-0 p-1.5 hover:bg-gray-200 dark:hover:bg-gray-700 rounded-full transition-colors"

@@ -22,8 +22,5 @@ export const store = configureStore({
     },
 });
 
-// RootState: kiểu dữ liệu cho toàn bộ root tree
 export type RootState = ReturnType<typeof store.getState>;
-
-// AppDispatch: Kiểu của dispatch function (dùng để gọi actions)
 export type AppDispatch = typeof store.dispatch;

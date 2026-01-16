@@ -19,8 +19,7 @@ const MessageItem = memo(({
     const { name: currentChatName } = useAppSelector(state => state.currentChat);
     const { user } = useAppSelector(state => state.auth);
     const dispatch = useAppDispatch();
-    
-    // Logic Avatar
+
     const specificUserAvatar = useUserAvatar(msg.name);
     const finalAvatar = chatType === 'room' ? specificUserAvatar : partnerAvatarFallback;
     

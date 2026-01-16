@@ -38,9 +38,6 @@ interface GiphyResponse {
     };
 }
 
-/**
- * Tìm kiếm GIF theo từ khóa
- */
 export const searchGifs = async (query: string, limit: number = 20): Promise<GiphyGif[]> => {
     try {
         if (!query.trim()) {
@@ -64,9 +61,6 @@ export const searchGifs = async (query: string, limit: number = 20): Promise<Gip
     }
 };
 
-/**
- * Lấy danh sách GIF trending
- */
 export const getTrendingGifs = async (limit: number = 20): Promise<GiphyGif[]> => {
     try {
         const response = await fetch(

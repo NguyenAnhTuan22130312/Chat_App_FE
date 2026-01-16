@@ -107,8 +107,7 @@ export default function Profile() {
                </div>
                <p className="text-xs text-gray-400 dark:text-gray-500 mt-1">Tên đăng nhập không thể thay đổi.</p>
             </div>
-            
-            {/* Theme Toggle Section */}
+
             <div className="pt-4 border-t border-gray-200 dark:border-gray-700">
               <label className="block text-gray-500 dark:text-gray-400 text-sm font-bold mb-3">
                 Giao diện
@@ -116,7 +115,6 @@ export default function Profile() {
               
               <div className="flex items-center justify-between p-3 bg-gray-50 dark:bg-gray-700/50 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors">
                 <div className="flex items-center gap-3">
-                  {/* Icon */}
                   <div className="p-2 bg-blue-100 dark:bg-blue-900/30 rounded-full">
                     {themeMode === 'dark' ? (
                       <svg className="w-5 h-5 text-blue-600 dark:text-blue-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -128,8 +126,7 @@ export default function Profile() {
                       </svg>
                     )}
                   </div>
-                  
-                  {/* Text */}
+
                   <div>
                     <p className="font-medium text-gray-700 dark:text-gray-200">Chế độ tối</p>
                     <p className="text-xs text-gray-500 dark:text-gray-400">
@@ -137,8 +134,7 @@ export default function Profile() {
                     </p>
                   </div>
                 </div>
-                
-                {/* Toggle Switch */}
+
                 <button
                   onClick={() => dispatch(toggleTheme())}
                   className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 dark:focus:ring-offset-gray-800 ${

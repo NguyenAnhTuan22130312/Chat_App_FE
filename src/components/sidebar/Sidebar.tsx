@@ -20,7 +20,6 @@ const Sidebar = () => {
             <SidebarRail />
             <SidebarPanel onOpenCreateRoom={() => setShowCreateRoom(true)} />
 
-            {/* Modal Tạo Nhóm */}
             {showCreateRoom && (
                 <div className="fixed inset-0 bg-black/40 backdrop-blur-sm flex items-center justify-center z-[100]">
                     <div className="bg-white dark:bg-gray-800 rounded-3xl p-6 w-[320px] shadow-2xl">

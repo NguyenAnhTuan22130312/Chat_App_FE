@@ -75,7 +75,6 @@ export const useWebRTC = (currentPartner: string) => {
    }, [currentPartner,chatType]);
 
 
-   // 2. Lắng nghe tín hiệu từ SocketService
    useEffect(() => {
        socketService.registerWebRTCListener(async (sender, payload,target) => {
            
@@ -153,16 +152,13 @@ export const useWebRTC = (currentPartner: string) => {
 
 
        const pc = createPeerConnection();
-       // Add tracks
        stream.getTracks().forEach(track => pc.addTrack(track, stream));
 
 
-       // Tạo Offer
        const offer = await pc.createOffer();
        await pc.setLocalDescription(offer);
 
 
-       // Gửi Offer
        socketService.sendWebRTCSignal(currentPartner, {
            type: 'OFFER',
            offer: offer
@@ -184,16 +180,13 @@ export const useWebRTC = (currentPartner: string) => {
        if (!pc) return;
 
 
-       // Add tracks
        stream.getTracks().forEach(track => pc.addTrack(track, stream));
 
 
-       // Tạo Answer
        const answer = await pc.createAnswer();
        await pc.setLocalDescription(answer);
 
 
-       // Gửi Answer
        socketService.sendWebRTCSignal(currentPartner, {
            type: 'ANSWER',
            answer: answer
@@ -217,7 +210,6 @@ export const useWebRTC = (currentPartner: string) => {
        setCallStatus('');
 
 
-       // Gửi tín hiệu kết thúc cho bên kia
        socketService.sendWebRTCSignal(currentPartner, { type: 'END_CALL' },chatType);
    };
 

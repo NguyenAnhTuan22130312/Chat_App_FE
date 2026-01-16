@@ -34,7 +34,6 @@ const chatSlice = createSlice({
         ) => {
             state.messagesByTarget[action.payload.target] = action.payload.messages;
         },
-        // --- ACTION MỚI: Dùng cho load more (Phân trang) ---
         addHistoryMessages: (
             state,
             action: PayloadAction<{ target: string; messages: ChatMessage[] }>

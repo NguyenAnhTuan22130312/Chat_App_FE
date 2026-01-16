@@ -20,7 +20,6 @@ export default function ChatInput() {
     const [showEmojiPicker, setShowEmojiPicker] = useState(false);
     const [showToolbar, setShowToolbar] = useState(false);
 
-    // --- STATE CHO MENTION ---
     const [showMentionList, setShowMentionList] = useState(false);
     const [mentionQuery, setMentionQuery] = useState('');
     const [filteredUsers, setFilteredUsers] = useState<any[]>([]);
@@ -52,16 +51,14 @@ export default function ChatInput() {
         return position;
     };
 
-    // Component con hiển thị 1 dòng trong popup mention
     const MentionItem = ({ user, onSelect }: { user: any, onSelect: (name: string) => void }) => {
         const avatar = useUserAvatar(user.name);
 
         return (
             <div
                 className="flex items-center gap-2 p-2 hover:bg-gray-100 dark:hover:bg-gray-700 cursor-pointer transition-colors"
-                // --- QUAN TRỌNG: Dùng onMouseDown ---
                 onMouseDown={(e) => {
-                    e.preventDefault(); // Giữ focus cho ô input
+                    e.preventDefault();
                     onSelect(user.name);
                 }}
             >
@@ -80,7 +77,7 @@ export default function ChatInput() {
             const length = childNode.textContent?.length || 0;
             const safeIndex = Math.min(index, length);
             try {
-                if (childNode.nodeType === 3) { // Text node
+                if (childNode.nodeType === 3) {
                     range.setStart(childNode, safeIndex);
                     range.setEnd(childNode, safeIndex);
                 } else {
@@ -98,13 +95,10 @@ export default function ChatInput() {
             let potentialUsers: any[] = [];
 
             if (currentType === 'people') {
-                // Chat 1-1: Chỉ tag người đang chat cùng
-                // Fallback: nếu chưa load partner kịp thì dùng luôn currentName
                 const partner = partners.find(p => p.name === currentName);
                 potentialUsers = partner ? [partner] : [{ name: currentName }];
             }
             else if (currentType === 'room') {
-                // Chat Room: Lấy userList từ Redux (đã lưu ở bước trước)
                 if (userList && Array.isArray(userList) && userList.length > 0) {
                     potentialUsers = userList;
                 } else {
@@ -112,29 +106,24 @@ export default function ChatInput() {
                 }
             }
 
-            // Lọc theo từ khóa
             const filtered = potentialUsers.filter(u =>
                 u.name && u.name.toLowerCase().includes(mentionQuery.toLowerCase())
             );
             setFilteredUsers(filtered);
         }
     }, [mentionQuery, currentName, currentType, userList, partners, showMentionList]);
-    // 2. HÀM CHECK KÝ TỰ @
     const handleContentChange = (newText: string) => {
         setText(newText);
 
         const inputElement = inputRef.current;
         if (!inputElement) return;
 
-        // DÙNG HELPER MỚI
         const selectionStart = getCaretIndex(inputElement);
         const textBeforeCursor = newText.slice(0, selectionStart);
 
-        // Regex tìm chữ @ cuối cùng
         const match = textBeforeCursor.match(/(@[a-zA-Z0-9_]*)$/);
 
         if (match) {
-            // Cắt bỏ chữ @ để lấy query tìm kiếm
             const query = match[0].slice(1);
             setMentionQuery(query);
             setShowMentionList(true);
@@ -150,14 +139,12 @@ export default function ChatInput() {
         const selectionStart = getCaretIndex(inputElement);
         const textBeforeCursor = text.slice(0, selectionStart);
 
-        // Tìm đoạn text đang gõ dở (ví dụ "@tu")
         const match = textBeforeCursor.match(/(@[a-zA-Z0-9_]*)$/);
 
         if (match) {
-            const matchString = match[0]; // "@tu"
+            const matchString = match[0];
             const matchIndex = textBeforeCursor.lastIndexOf(matchString);
 
-            // Cắt bỏ đoạn "@tu" cũ, thay bằng "@username "
             const prefix = textBeforeCursor.slice(0, matchIndex);
             const suffix = text.slice(selectionStart);
 
@@ -166,7 +153,6 @@ export default function ChatInput() {
             setText(newText);
             setShowMentionList(false);
 
-            // Đặt lại con trỏ dùng HELPER MỚI (fix crash)
             setTimeout(() => {
                 inputElement.focus();
                 const newCursorPos = prefix.length + username.length + 2; // +2 vì có @ và dấu cách
@@ -175,24 +161,18 @@ export default function ChatInput() {
         }
     };
 
-    // --- LOGIC CŨ GIỮ NGUYÊN ---
     const processMentions = (rawContent: string) => {
-        // Tạo danh sách whitelist: Những cái tên nào ĐƯỢC PHÉP in đậm/nghiêng
         let validUsernames: string[] = [];
 
         if (currentType === 'room') {
-            // Nếu là Room: Lấy danh sách thành viên từ userList
             if (userList && Array.isArray(userList)) {
                 validUsernames = userList.map((u: any) => u.name);
             }
         } else {
-            // Nếu là People: Chỉ có người mình đang chat
             if (currentName) validUsernames = [currentName];
         }
 
-        // Regex thay thế
         return rawContent.replace(/(^|\s)@([a-zA-Z0-9_]+)/g, (match, prefix, name) => {
-            // Chỉ in đậm nếu tên có trong danh sách hợp lệ
 
             if (validUsernames.includes(name)) {
                 return `${prefix}***@${name}***`;
@@ -335,7 +315,6 @@ export default function ChatInput() {
     };
 
     const handleImageSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
-        // ... (Giữ nguyên logic upload ảnh)
         const file = e.target.files?.[0];
         if (!file) return;
 
@@ -351,10 +330,8 @@ export default function ChatInput() {
             });
             const data = await response.json();
             if (data.secure_url) {
-                // 1. Gửi qua Socket (Hiển thị ngay trong chat)
                 sendMessage(data.secure_url);
 
-                // 2. LƯU VÀO FIREBASE (Để hiện bên Sidebar) --- THÊM ĐOẠN NÀY
                 if (user?.username && currentName && currentType) {
                     saveChatImage(currentName, user.username, currentType, data.secure_url);
                 }
@@ -368,7 +345,6 @@ export default function ChatInput() {
     };
 
     const handleKeyDown = (e: React.KeyboardEvent) => {
-        // Nếu popup mention đang hiện, cho phép dùng Enter để chọn user đầu tiên (tuỳ chọn)
         if (showMentionList && filteredUsers.length > 0 && e.key === 'Enter') {
             e.preventDefault();
             handleSelectUser(filteredUsers[0].name);
@@ -390,7 +366,6 @@ export default function ChatInput() {
 
     return (
         <div className="relative">
-            {/* 4. POPUP LIST USER (HIỂN THỊ KHI GÕ @) */}
             {showMentionList && filteredUsers.length > 0 && (
                 <div className="absolute bottom-full left-10 mb-2 w-64 max-h-48 overflow-y-auto bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl shadow-lg z-50 animate-in fade-in zoom-in duration-200">
                     <div className="p-2 border-b border-gray-100 dark:border-gray-700 text-xs font-bold text-gray-400 uppercase">
@@ -402,7 +377,6 @@ export default function ChatInput() {
                 </div>
             )}
 
-            {/* Reply Preview */}
             {replyingTo.message && replyingTo.target === currentName && (
                 <ReplyPreview message={replyingTo.message} onClose={handleCancelReply} />
             )}
@@ -452,7 +426,6 @@ export default function ChatInput() {
                 </div>
 
                 <div className="flex-1 relative flex items-center">
-                    {/* SỬA: onChange truyền vào hàm mới handleContentChange */}
                     <RichTextInput
                         value={text}
                         onChange={handleContentChange}

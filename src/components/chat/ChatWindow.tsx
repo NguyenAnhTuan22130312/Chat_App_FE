@@ -6,11 +6,10 @@ import { useAppSelector, useAppDispatch } from '../../hooks/reduxHooks';
 import { socketService } from '../../services/socketService';
 import { useUserAvatar } from '../../hooks/useUserAvatar';
 import { parseDate } from "../../utils/dateUtils";
-// import { setMessages } from '../../store/slices/chatSlice'; // Có thể bỏ nếu không dùng
 import { useWebRTC } from '../../hooks/useWebRTC';
 import VideoCallModal from './VideoCallModal';
 import PinnedMessageBar from './PinnedMessageBar';
-import SidebarChatWindow from './SidebarChatWindow'; // <--- IMPORT MỚI
+import SidebarChatWindow from './SidebarChatWindow';
 
 const GROUPING_THRESHOLD_MINUTES = 10;
 const SEPARATOR_THRESHOLD_HOURS = 1;
@@ -26,21 +25,19 @@ export default function ChatWindow() {
         return currentChatName ? (messagesByTarget[currentChatName] || []) : [];
     }, [currentChatName, messagesByTarget]);
 
-    // --- REFS ---
     const messagesEndRef = useRef<HTMLDivElement>(null);
     const scrollContainerRef = useRef<HTMLDivElement>(null);
     const scrollHeightRef = useRef<number>(0);
     const lastMessageIdRef = useRef<string | null>(null);
     const loadSafetyTimerRef = useRef<NodeJS.Timeout | null>(null);
 
-    // --- STATES ---
+
     const [page, setPage] = useState(1);
     const [hasMore, setHasMore] = useState(true);
     const [isLoadingMore, setIsLoadingMore] = useState(false);
 
     const currentChatAvatar = useUserAvatar(currentChatName || '');
 
-    // --- WEBRTC HOOK ---
     const {
         localStream,
         remoteStream,
@@ -52,7 +49,6 @@ export default function ChatWindow() {
         endCall
     } = useWebRTC(currentChatName || '');
 
-    // 1. RESET KHI ĐỔI CHAT
     useEffect(() => {
         if (isAuthenticated && currentChatName && currentChatType) {
             setPage(1);
@@ -75,7 +71,6 @@ export default function ChatWindow() {
         }
     }, [currentChatName, currentChatType, isAuthenticated, dispatch]);
 
-    // 2. XỬ LÝ SCROLL
     const handleScroll = (e: React.UIEvent<HTMLDivElement>) => {
         const { scrollTop, scrollHeight } = e.currentTarget;
 
@@ -102,7 +97,6 @@ export default function ChatWindow() {
         }
     };
 
-    // 3. FIX NHẢY LUNG TUNG & TẮT LOADING KHI THÀNH CÔNG
     useLayoutEffect(() => {
         if (isLoadingMore && scrollContainerRef.current) {
             if (loadSafetyTimerRef.current) clearTimeout(loadSafetyTimerRef.current);
@@ -119,7 +113,6 @@ export default function ChatWindow() {
         }
     }, [messages, isLoadingMore]);
 
-    // 4. AUTO SCROLL BOTTOM
     useEffect(() => {
         if (messages.length === 0) return;
         const lastMsg = messages[messages.length - 1];
@@ -133,7 +126,6 @@ export default function ChatWindow() {
         }
     }, [messages, isLoadingMore]);
 
-    // --- RENDER ---
 
     if (!currentChatName) {
         return (
@@ -145,16 +137,13 @@ export default function ChatWindow() {
     }
 
     return (
-        // --- LAYOUT CHÍNH: FLEX ROW ---
         <div className="flex h-screen bg-white dark:bg-gray-900 w-full">
 
-            {/* 1. KHUNG CHAT CHÍNH (Chiếm phần lớn diện tích) */}
             <div className="flex-1 flex flex-col min-w-0 border-l border-gray-300 dark:border-gray-700 relative h-full">
 
                 <ChatHeader onCallClick={startCall} />
                 <PinnedMessageBar />
 
-                {/* Message List */}
                 <div
                     ref={scrollContainerRef}
                     onScroll={handleScroll}
@@ -222,7 +211,6 @@ export default function ChatWindow() {
 
                 <ChatInput />
 
-                {/* MODAL VIDEO CALL (Vẫn nằm trong khung chat chính để đè lên tin nhắn) */}
                 {(isCalling || isIncoming) && (
                     <VideoCallModal
                         localStream={localStream}
@@ -236,8 +224,6 @@ export default function ChatWindow() {
                 )}
             </div>
 
-            {/* 2. SIDEBAR PHẢI (THÔNG TIN) */}
-            {/* hidden xl:block: Ẩn trên màn hình nhỏ, hiện trên màn hình lớn (xl) */}
             <div className="hidden xl:block h-full shadow-lg z-10 border-l border-gray-200 dark:border-gray-800">
                 <SidebarChatWindow />
             </div>
