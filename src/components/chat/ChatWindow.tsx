@@ -6,15 +6,12 @@ import { useAppSelector, useAppDispatch } from '../../hooks/reduxHooks';
 import { socketService } from '../../services/socketService';
 import { useUserAvatar } from '../../hooks/useUserAvatar';
 import { parseDate } from "../../utils/dateUtils";
-
-// import { setMessages } from '../../store/slices/chatSlice';
 import { useWebRTC } from '../../hooks/useWebRTC';
 import VideoCallModal from './VideoCallModal';
 import PinnedMessageBar from './PinnedMessageBar';
 import { listenForReactions } from '../../services/firebaseConfig';
 import { updateAllReactions } from '../../store/slices/chatSlice';
-import SidebarChatWindow from './SidebarChatWindow'; 
-
+import SidebarChatWindow from './SidebarChatWindow';
 
 const GROUPING_THRESHOLD_MINUTES = 10;
 const SEPARATOR_THRESHOLD_HOURS = 1;
@@ -30,13 +27,11 @@ export default function ChatWindow() {
         return currentChatName ? (messagesByTarget[currentChatName] || []) : [];
     }, [currentChatName, messagesByTarget]);
 
-
     const messagesEndRef = useRef<HTMLDivElement>(null);
     const scrollContainerRef = useRef<HTMLDivElement>(null);
     const scrollHeightRef = useRef<number>(0);
-    const lastMessageIdRef = useRef<string | null>(null);
-    const loadSafetyTimerRef = useRef<NodeJS.Timeout | null>(null);
 
+    const isFirstLoadRef = useRef(true);
 
     const [page, setPage] = useState(1);
     const [hasMore, setHasMore] = useState(true);
@@ -45,15 +40,11 @@ export default function ChatWindow() {
     const currentChatAvatar = useUserAvatar(currentChatName || '');
 
     const {
-        localStream,
-        remoteStream,
-        isCalling,
-        isIncoming,
-        callStatus,
-        startCall,
-        answerCall,
-        endCall
+        localStream, remoteStream, isCalling, isIncoming, callStatus,
+        startCall, answerCall, endCall
     } = useWebRTC(currentChatName || '');
+
+    const prevLastMessageIdRef = useRef<string | null>(null);
 
     useEffect(() => {
         if (isAuthenticated && currentChatName && currentChatType) {
@@ -61,37 +52,23 @@ export default function ChatWindow() {
             setHasMore(true);
             setIsLoadingMore(false);
             scrollHeightRef.current = 0;
-            lastMessageIdRef.current = null;
-            if (loadSafetyTimerRef.current) clearTimeout(loadSafetyTimerRef.current);
+            isFirstLoadRef.current = true;
 
-            const timer = setTimeout(() => {
-                if (currentChatType === 'room') {
-                    socketService.getRoomHistory(currentChatName || '', 1);
-                } else {
-                    socketService.getHistory(currentChatName || '', 1);
-                }
-            }, 50);
-            return () => {
-                clearTimeout(timer);
-            };
+            if (currentChatType === 'room') {
+                socketService.getRoomHistory(currentChatName || '', 1);
+            } else {
+                socketService.getHistory(currentChatName || '', 1);
+            }
         }
     }, [currentChatName, currentChatType, isAuthenticated, dispatch]);
-
 
     const handleScroll = (e: React.UIEvent<HTMLDivElement>) => {
         const { scrollTop, scrollHeight } = e.currentTarget;
 
-        if (scrollTop === 0 && hasMore && !isLoadingMore && messages.length > 0) {
-            console.log(` Requesting Page ${page + 1}...`);
+        if (scrollTop < 50 && hasMore && !isLoadingMore && messages.length > 0) {
+
             scrollHeightRef.current = scrollHeight;
             setIsLoadingMore(true);
-
-            if (loadSafetyTimerRef.current) clearTimeout(loadSafetyTimerRef.current);
-            loadSafetyTimerRef.current = setTimeout(() => {
-                console.warn("⚠ Load timer expired. Server returned empty or timed out.");
-                setIsLoadingMore(false);
-                setHasMore(false);
-            }, 2000);
 
             const nextPage = page + 1;
             setPage(nextPage);
@@ -106,50 +83,56 @@ export default function ChatWindow() {
 
     useLayoutEffect(() => {
         if (isLoadingMore && scrollContainerRef.current) {
-            if (loadSafetyTimerRef.current) clearTimeout(loadSafetyTimerRef.current);
-
             const container = scrollContainerRef.current;
             const newScrollHeight = container.scrollHeight;
             const diff = newScrollHeight - scrollHeightRef.current;
 
             if (diff > 0) {
-                container.scrollTop = diff;
+                container.scrollTop = diff + (container.scrollTop || 0);
             }
-
             setIsLoadingMore(false);
         }
-    }, [messages, isLoadingMore]);
+    }, [messages]);
 
     useEffect(() => {
         if (messages.length === 0) return;
+
         const lastMsg = messages[messages.length - 1];
         const lastMsgId = lastMsg.id || (lastMsg.createAt + lastMsg.mes);
+        const isMyMsg = lastMsg.name === myUsername;
 
-        if (lastMsgId !== lastMessageIdRef.current) {
-            if (!isLoadingMore) {
-                messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+        const isNewMessageArrived = lastMsgId !== prevLastMessageIdRef.current;
+
+        if (isFirstLoadRef.current) {
+            messagesEndRef.current?.scrollIntoView({ behavior: 'auto' });
+            isFirstLoadRef.current = false;
+        } else {
+            if (isNewMessageArrived) {
+                if (isMyMsg) {
+                    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+                } else {
+                    const container = scrollContainerRef.current;
+                    if (container) {
+                        const isNearBottom = container.scrollHeight - container.scrollTop - container.clientHeight < 200;
+                        if (isNearBottom) {
+                            messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+                        }
+                    }
+                }
             }
-            lastMessageIdRef.current = lastMsgId;
         }
-    }, [messages, isLoadingMore]);
+
+        prevLastMessageIdRef.current = lastMsgId;
+
+    }, [messages, myUsername]);
+
     useEffect(() => {
         if (!currentChatName || !user?.username || !currentChatType) return;
-
-        const unsubscribe = listenForReactions(
-            user.username,
-            currentChatName,
-            currentChatType,
-            (data) => {
-                dispatch(updateAllReactions({
-                    target: currentChatName,
-                    reactionsData: data
-                }));
-            }
-        );
-
+        const unsubscribe = listenForReactions(user.username, currentChatName, currentChatType, (data) => {
+            dispatch(updateAllReactions({ target: currentChatName, reactionsData: data }));
+        });
         return () => unsubscribe();
     }, [currentChatName, currentChatType, user, dispatch]);
-
 
     if (!currentChatName) {
         return (
@@ -161,21 +144,18 @@ export default function ChatWindow() {
     }
 
     return (
-
         <div className="flex h-screen bg-white dark:bg-gray-900 w-full">
-
             <div className="flex-1 flex flex-col min-w-0 border-l border-gray-300 dark:border-gray-700 relative h-full">
-
                 <ChatHeader onCallClick={startCall} />
                 <PinnedMessageBar />
 
                 <div
                     ref={scrollContainerRef}
                     onScroll={handleScroll}
-                    className="flex-1 overflow-y-auto p-4 flex flex-col space-y-0.5 custom-scrollbar relative"
+                    className="flex-1 overflow-y-auto px-2 py-2 flex flex-col space-y-1 custom-scrollbar relative"
                 >
                     {isLoadingMore && (
-                        <div className="flex justify-center py-2 w-full shrink-0 my-2">
+                        <div className="flex justify-center py-2 w-full shrink-0">
                             <div className="bg-white/80 dark:bg-gray-800/80 p-1.5 rounded-full shadow-sm">
                                 <svg className="animate-spin h-5 w-5 text-blue-500" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
                                     <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
@@ -193,10 +173,7 @@ export default function ChatWindow() {
 
                     {messages
                         .filter(msg => {
-                            try {
-                                const parsed = JSON.parse(msg.mes);
-                                return parsed.type !== 'WEBRTC_SIGNAL';
-                            } catch { return true; }
+                            try { return JSON.parse(msg.mes).type !== 'WEBRTC_SIGNAL'; } catch { return true; }
                         })
                         .map((msg, index) => {
                             const isMe = msg.name === myUsername;
@@ -236,7 +213,6 @@ export default function ChatWindow() {
 
                 <ChatInput />
 
-
                 {(isCalling || isIncoming) && (
                     <VideoCallModal
                         localStream={localStream}
@@ -253,7 +229,6 @@ export default function ChatWindow() {
             <div className="hidden xl:block h-full shadow-lg z-10 border-l border-gray-200 dark:border-gray-800">
                 <SidebarChatWindow />
             </div>
-
         </div>
     );
 }

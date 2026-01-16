@@ -23,7 +23,7 @@ const QUICK_REACTIONS = ['👍', '❤️', '😆', '😮', '😢', '😡'];
 const MessageBubble = ({ text, isMe, avatar, timestamp, senderName, replyTo, onReply, onPin, reactions, currentUsername, onReaction }: MessageBubbleProps) => {
     const [showActions, setShowActions] = useState(false);
     const [showReactionPicker, setShowReactionPicker] = useState(false);
-    
+
     const timerRef = useRef<NodeJS.Timeout | null>(null);
     const isLongPressRef = useRef(false);
     const pickerRef = useRef<HTMLDivElement>(null);
@@ -143,17 +143,16 @@ const MessageBubble = ({ text, isMe, avatar, timestamp, senderName, replyTo, onR
                 handleEndPress();
             }}
         >
-            {!isMe && (
-                <div className="w-8 h-8 mr-2 shrink-0 flex items-start">
-                    {avatar ? (
-                        <img
-                            src={avatar || "https://via.placeholder.com/32"}
-                            alt="avatar"
-                            className="w-8 h-8 rounded-full object-cover border border-gray-200"
-                        />
-                    ) : (
-                        <div className="w-8 h-8" />
-                    )}
+            {!isMe && avatar && (
+                <div className="w-8 h-8 shrink-0 flex items-start">
+                    <img
+                        src={avatar}
+                        alt="avatar"
+                        className="w-8 h-8 rounded-full object-cover border border-gray-200"
+                        onError={(e) => {
+                            e.currentTarget.style.display = 'none';
+                        }}
+                    />
                 </div>
             )}
 
@@ -164,7 +163,7 @@ const MessageBubble = ({ text, isMe, avatar, timestamp, senderName, replyTo, onR
                     </span>
                 )}
 
-                <div 
+                <div
                     className={`relative z-10 pointer-events-auto text-[15px] leading-relaxed break-words overflow-visible ${bubbleStyle} transition-transform active:scale-95 cursor-pointer`}
                     onMouseDown={handleStartPress}
                     onMouseUp={handleEndPress}
@@ -246,7 +245,7 @@ const MessageBubble = ({ text, isMe, avatar, timestamp, senderName, replyTo, onR
                     )}
 
                     {showReactionPicker && (
-                        <div 
+                        <div
                             ref={pickerRef}
                             className={`absolute bottom-full mb-2 z-50 min-w-max animate-fade-in-up flex gap-1 p-1 bg-white dark:bg-gray-800 rounded-full shadow-xl border border-gray-100 dark:border-gray-600
                                 ${isMe ? 'right-0 origin-bottom-right' : 'left-0 origin-bottom-left'}
