@@ -12,6 +12,7 @@ export interface ChatMessage {
         message: string;
         timestamp?: string;
     };
+    reactions?: Record<string, string[]>;
 }
 
 interface ChatState {
@@ -24,6 +25,21 @@ const initialState: ChatState = {
     pinnedMessages: {},
 };
 
+const sanitizeId = (key: any) => {
+    if (!key) return "";
+    const strKey = String(key);
+    return strKey
+        .replace(/\./g, '_dot_')
+        .replace(/#/g, '_hash_')
+        .replace(/\$/g, '_dollar_')
+        .replace(/\[/g, '_bracket_open_')
+        .replace(/\]/g, '_bracket_close_')
+        .replace(/@/g, '_at_');
+};
+
+
+
+
 const chatSlice = createSlice({
     name: "chat",
     initialState,
@@ -34,7 +50,6 @@ const chatSlice = createSlice({
         ) => {
             state.messagesByTarget[action.payload.target] = action.payload.messages;
         },
-        // --- ACTION MỚI: Dùng cho load more (Phân trang) ---
         addHistoryMessages: (
             state,
             action: PayloadAction<{ target: string; messages: ChatMessage[] }>
@@ -79,8 +94,26 @@ const chatSlice = createSlice({
                 delete state.pinnedMessages[action.payload.target];
             }
         },
+        updateAllReactions: (
+            state,
+            action: PayloadAction<{ target: string; reactionsData: any }>
+        ) => {
+            const { target, reactionsData } = action.payload;
+            const messages = state.messagesByTarget[target];
+            if (!messages) return;
+            messages.forEach(msg => {
+                const rawId = msg.id || `${msg.name}_${msg.createAt}`;
+                const safeId = sanitizeId(rawId);
+
+                if (reactionsData && reactionsData[safeId]) {
+                    msg.reactions = reactionsData[safeId];
+                } else {
+                    msg.reactions = undefined; 
+                }
+            });
+        },
     },
 });
 
-export const {setMessages, addMessage, clearMessages,addHistoryMessages,setPinnedMessage} = chatSlice.actions;
+export const {setMessages, addMessage, clearMessages,addHistoryMessages,setPinnedMessage,updateAllReactions} = chatSlice.actions;
 export default chatSlice.reducer;

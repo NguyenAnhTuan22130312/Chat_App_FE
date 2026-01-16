@@ -17,20 +17,19 @@ const firebaseConfig = {
 const app = initializeApp(firebaseConfig);
 export const database = getDatabase(app);
 
-// --- HÀM MỚI CẦN THÊM (SỬA LỖI TS2305) ---
-export const sanitizeFirebaseKey = (key: string): string => {
-    if (!key) return "";
-    return key
+export const sanitizeFirebaseKey = (key: any) => {
+    if (key === null || key === undefined) return "";
+    const strKey = String(key); 
+    return strKey
         .replace(/\./g, '_dot_')
         .replace(/#/g, '_hash_')
         .replace(/\$/g, '_dollar_')
         .replace(/\[/g, '_bracket_open_')
         .replace(/\]/g, '_bracket_close_')
-        .replace(/@/g, '_at_');
+        .replace(/@/g, '_at_'); 
 };
 
 export const saveAvatarToFirebase = (username: string, avatarUrl: string) => {
-    // Nên dùng sanitize ở đây luôn để tránh lỗi nếu tên có ký tự lạ
     const safeUsername = sanitizeFirebaseKey(username);
     const userRef = ref(database, 'users/' + safeUsername + '/avatar');
     set(userRef, avatarUrl).catch(err => console.error("Lỗi lưu Firebase:", err));
@@ -97,4 +96,58 @@ export const getAvatarFromFirebase = async (username: string): Promise<string | 
         console.error(error);
     }
     return null;
+};
+
+export const toggleReactionToFirebase = async (
+    currentUser: string,
+    targetUser: string,
+    type: 'room' | 'people',
+    message: any,
+    emoji: string
+) => {
+    const chatKey = type === 'room' ? targetUser : getChatKey(currentUser, targetUser);
+    const rawMessageId = message.id || `${message.name}_${message.createAt}`;
+    const safeMessageId = sanitizeFirebaseKey(rawMessageId);
+
+    const reactionRef = ref(database, `reactions/${chatKey}/${safeMessageId}/${emoji}`);
+
+    try {
+        const snapshot = await get(reactionRef);
+        let users: string[] = [];
+        if (snapshot.exists()) {
+            users = snapshot.val();
+        }
+
+        const userIndex = users.indexOf(currentUser);
+        if (userIndex > -1) {
+            users.splice(userIndex, 1); 
+        } else {
+            users.push(currentUser); 
+        }
+
+        if (users.length === 0) {
+            await remove(reactionRef); 
+        } else {
+            await set(reactionRef, users);
+        }
+    } catch (error) {
+        console.error("Lỗi toggle reaction:", error);
+    }
+};
+
+export const listenForReactions = (
+    currentUser: string,
+    targetUser: string,
+    type: 'room' | 'people',
+    callback: (data: any) => void
+) => {
+    const chatKey = type === 'room' ? targetUser : getChatKey(currentUser, targetUser);
+    const reactionsRef = ref(database, `reactions/${chatKey}`);
+
+    const unsubscribe = onValue(reactionsRef, (snapshot) => {
+        const data = snapshot.val(); 
+        callback(data);
+    });
+
+    return unsubscribe;
 };

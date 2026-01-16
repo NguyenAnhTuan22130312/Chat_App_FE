@@ -10,6 +10,8 @@ import { setMessages } from '../../store/slices/chatSlice';
 import { useWebRTC } from '../../hooks/useWebRTC';
 import VideoCallModal from './VideoCallModal';
 import PinnedMessageBar from './PinnedMessageBar';
+import { listenForReactions } from '../../services/firebaseConfig';
+import { updateAllReactions } from '../../store/slices/chatSlice';
 
 
 const GROUPING_THRESHOLD_MINUTES = 10;
@@ -27,7 +29,6 @@ export default function ChatWindow() {
    }, [currentChatName, messagesByTarget]);
 
 
-   // --- REFS ---
    const messagesEndRef = useRef<HTMLDivElement>(null);
    const scrollContainerRef = useRef<HTMLDivElement>(null);
    const scrollHeightRef = useRef<number>(0);
@@ -35,7 +36,6 @@ export default function ChatWindow() {
    const loadSafetyTimerRef = useRef<NodeJS.Timeout | null>(null);
 
 
-   // --- STATES ---
    const [page, setPage] = useState(1);
    const [hasMore, setHasMore] = useState(true);
    const [isLoadingMore, setIsLoadingMore] = useState(false);
@@ -44,7 +44,6 @@ export default function ChatWindow() {
    const currentChatAvatar = useUserAvatar(currentChatName || '');
 
 
-   // --- WEBRTC HOOK ---
    const {
        localStream,
        remoteStream,
@@ -153,6 +152,24 @@ export default function ChatWindow() {
            lastMessageIdRef.current = lastMsgId;
        }
    }, [messages, isLoadingMore]);
+
+   useEffect(() => {
+    if (!currentChatName || !user?.username || !currentChatType) return;
+
+    const unsubscribe = listenForReactions(
+        user.username,
+        currentChatName,
+        currentChatType,
+        (data) => {
+            dispatch(updateAllReactions({
+                target: currentChatName,
+                reactionsData: data
+            }));
+        }
+    );
+
+    return () => unsubscribe();
+}, [currentChatName, currentChatType, user, dispatch]);
 
 
 
