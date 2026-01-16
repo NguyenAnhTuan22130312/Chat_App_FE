@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useAppSelector, useAppDispatch } from '../../hooks/reduxHooks';
 import { useUserAvatar } from '../../hooks/useUserAvatar';
 import { useFirebaseLists } from '../../hooks/useFirebaseLists';
@@ -8,11 +8,15 @@ import {
     hideGroup,
     blockUser
 } from '../../services/friendService';
+import { saveGroupAvatarToFirebase } from '../../services/firebaseConfig'; // <--- IMPORT HÀM LƯU AVATAR GROUP MỚI
 import { socketService } from '../../services/socketService';
-import { clearCurrentChat } from '../../store/slices/currentChatSlice'; // Import action xóa chat hiện tại
-import ConfirmModal from '../common/ConfirmModal'; // Import Confirm Modal
+import { clearCurrentChat } from '../../store/slices/currentChatSlice';
+import ConfirmModal from '../common/ConfirmModal';
 
-// --- COMPONENT THÀNH VIÊN ---
+// --- CONFIG CLOUDINARY (Để upload ảnh) ---
+const CLOUD_NAME = "dox9vbxjn";
+const UPLOAD_PRESET = "chat_app_preset";
+
 const MemberItem = ({ name }: { name: string }) => {
     const avatar = useUserAvatar(name);
     return (
@@ -23,7 +27,6 @@ const MemberItem = ({ name }: { name: string }) => {
     );
 };
 
-// --- COMPONENT MỜI BẠN BÈ ---
 const AddMemberItem = ({ name, onAdd }: { name: string, onAdd: () => void }) => {
     const avatar = useUserAvatar(name);
     return (
@@ -43,31 +46,30 @@ const AddMemberItem = ({ name, onAdd }: { name: string, onAdd: () => void }) => 
     );
 }
 
-// --- COMPONENT CHÍNH ---
 const SidebarChatWindow = () => {
     const dispatch = useAppDispatch();
 
-    // Lấy thông tin chat và USERLIST từ Redux
     const { name: currentName, type, userList } = useAppSelector((state) => state.currentChat as any);
     const currentUser = useAppSelector((state) => state.auth.user?.username || '');
+
+    // Avatar này sẽ tự động cập nhật khi Firebase thay đổi nhờ hook useUserAvatar
     const avatar = useUserAvatar(currentName || '');
 
     const { friends } = useFirebaseLists(currentUser);
 
-    // States
+    const fileInputRef = useRef<HTMLInputElement>(null);
+    const [isUploadingAvatar, setIsUploadingAvatar] = useState(false);
+
     const [showAddMember, setShowAddMember] = useState(false);
     const [searchKeyword, setSearchKeyword] = useState('');
     const [mediaImages, setMediaImages] = useState<string[]>([]);
-
-    // State cho Modal Xem Ảnh (Lightbox)
     const [previewImage, setPreviewImage] = useState<string | null>(null);
-
-    // State cho Modal Xác Nhận (Block/Hide)
     const [modalConfig, setModalConfig] = useState<{
         isOpen: boolean; title: string; message: string; isDanger?: boolean; onConfirm: () => void;
     }>({ isOpen: false, title: '', message: '', isDanger: false, onConfirm: () => {} });
 
-    // --- 1. LẤY ẢNH TỪ FIREBASE ---
+
+
     useEffect(() => {
         if (currentName && currentUser && type) {
             const unsubscribe = subscribeToChatImages(currentName, currentUser, type, (urls) => {
@@ -79,13 +81,46 @@ const SidebarChatWindow = () => {
         }
     }, [currentName, currentUser, type]);
 
-    // --- 2. LỌC BẠN ĐỂ MỜI ---
     const eligibleFriends = friends.filter(friendName => {
         if (!userList) return true;
         return !userList.some((member: any) => member.name === friendName);
     });
 
-    // --- CÁC HÀM XỬ LÝ (HANDLERS) ---
+    // --- HÀM MỚI: XỬ LÝ ĐỔI AVATAR GROUP ---
+    const handleGroupAvatarChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+        const file = e.target.files?.[0];
+        if (!file || !currentName) return;
+
+
+        // Reset input để chọn lại cùng 1 file vẫn dc
+        if (fileInputRef.current) fileInputRef.current.value = '';
+
+        setIsUploadingAvatar(true);
+
+        try {
+            // 1. Upload lên Cloudinary
+            const formData = new FormData();
+            formData.append('file', file);
+            formData.append('upload_preset', UPLOAD_PRESET);
+
+            const response = await fetch(`https://api.cloudinary.com/v1_1/${CLOUD_NAME}/image/upload`, {
+                method: 'POST', body: formData,
+            });
+            const data = await response.json();
+
+            if (data.secure_url) {
+                // 2. Lưu link vào Firebase (Node groups)
+                saveGroupAvatarToFirebase(currentName, data.secure_url);
+
+                // 3. Gửi thông báo socket
+                socketService.sendMessageToRoom(currentName, `${currentUser} đã đổi ảnh đại diện nhóm.`);
+            }
+        } catch (error) {
+            alert("Lỗi khi đổi ảnh nhóm: " + error);
+        } finally {
+            setIsUploadingAvatar(false);
+        }
+    };
 
     const handleInvite = async (targetFriend: string) => {
         if (!currentUser || !currentName) return;
@@ -97,7 +132,6 @@ const SidebarChatWindow = () => {
         } catch (error) { alert("Lỗi: " + error); }
     };
 
-    // Hàm mở Modal Xác nhận
     const openConfirm = (title: string, message: string, action: () => void, isDanger = false) => {
         setModalConfig({
             isOpen: true, title, message, isDanger,
@@ -108,30 +142,28 @@ const SidebarChatWindow = () => {
         });
     };
 
-    // Xử lý Ẩn Nhóm
     const handleHideGroup = () => {
         if (!currentUser || !currentName) return;
         openConfirm(
             "Ẩn nhóm chat?",
-            `Bạn có chắc muốn ẩn nhóm "${currentName}"? Nhóm sẽ chuyển vào mục lưu trữ.`,
+            `Bạn có chắc muốn ẩn nhóm "${currentName}"?`,
             async () => {
                 await hideGroup(currentUser, currentName);
-                dispatch(clearCurrentChat()); // Đóng khung chat sau khi ẩn
+                dispatch(clearCurrentChat());
             }
         );
     };
 
-    // Xử lý Chặn Người dùng
     const handleBlockUser = () => {
         if (!currentUser || !currentName) return;
         openConfirm(
             "Chặn người dùng?",
-            `Bạn có chắc chắn muốn chặn ${currentName}? Bạn sẽ không nhận được tin nhắn từ họ nữa.`,
+            `Bạn có chắc chắn muốn chặn ${currentName}?`,
             async () => {
                 await blockUser(currentUser, currentName);
-                dispatch(clearCurrentChat()); // Đóng khung chat sau khi chặn
+                dispatch(clearCurrentChat());
             },
-            true // Màu đỏ
+            true
         );
     };
 
@@ -140,13 +172,46 @@ const SidebarChatWindow = () => {
     return (
         <div className="w-[300px] h-full border-l border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 flex flex-col overflow-y-auto animate-in slide-in-from-right duration-300 relative">
 
-            {/* --- HEADER --- */}
+            <input
+                type="file"
+                ref={fileInputRef}
+                onChange={handleGroupAvatarChange}
+                className="hidden"
+                accept="image/*"
+            />
+
             <div className="p-6 flex flex-col items-center border-b border-gray-100 dark:border-gray-800">
-                <img src={avatar} alt={currentName} className="w-24 h-24 rounded-full object-cover border-4 border-gray-100 dark:border-gray-800 mb-3 shadow-sm" />
+
+                {/* --- KHU VỰC AVATAR (Có xử lý hover & loading) --- */}
+                <div className="relative group mb-3">
+                    <img
+                        src={avatar}
+                        alt={currentName}
+                        className={`w-24 h-24 rounded-full object-cover border-4 border-gray-100 dark:border-gray-800 shadow-sm transition-opacity ${isUploadingAvatar ? 'opacity-50' : ''}`}
+                    />
+
+                    {/* Loading Spinner khi đang upload */}
+                    {isUploadingAvatar && (
+                        <div className="absolute inset-0 flex items-center justify-center">
+                            <svg className="animate-spin h-8 w-8 text-blue-500" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg>
+                        </div>
+                    )}
+
+                    {/* Overlay Camera Icon (Chỉ hiện khi là ROOM và hover vào ảnh) */}
+                    {!isUploadingAvatar && type === 'room' && (
+                        <div
+                            onClick={() => fileInputRef.current?.click()}
+                            className="absolute inset-0 bg-black/40 rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity cursor-pointer"
+                            title="Đổi ảnh nhóm"
+                        >
+                            <svg className="w-8 h-8 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z" /><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 13a3 3 0 11-6 0 3 3 0 016 0z" /></svg>
+                        </div>
+                    )}
+                </div>
+
                 <h2 className="text-xl font-bold text-gray-900 dark:text-white text-center truncate w-full">{currentName}</h2>
                 <p className="text-sm text-gray-500 capitalize">{type === 'room' ? 'Nhóm trò chuyện' : 'Cá nhân'}</p>
 
-                {/* NÚT THÊM THÀNH VIÊN (ROOM ONLY) */}
                 {type === 'room' && (
                     <div className="mt-4 w-full relative">
                         {!showAddMember ? (
@@ -180,7 +245,6 @@ const SidebarChatWindow = () => {
                 )}
             </div>
 
-            {/* --- TÌM KIẾM TIN NHẮN --- */}
             <div className="p-4 border-b border-gray-100 dark:border-gray-800">
                 <h3 className="text-xs font-bold text-gray-400 uppercase tracking-wider mb-3">Tìm kiếm tin nhắn</h3>
                 <div className="relative group">
@@ -197,7 +261,6 @@ const SidebarChatWindow = () => {
                 </div>
             </div>
 
-            {/* --- DANH SÁCH THÀNH VIÊN (FIX BUG KHÔNG HIỆN) --- */}
             {type === 'room' && (
                 <div className="p-4 border-b border-gray-100 dark:border-gray-800">
                     <div className="flex items-center justify-between mb-3">
@@ -206,11 +269,9 @@ const SidebarChatWindow = () => {
                             {userList ? userList.length : 0}
                         </span>
                     </div>
-                    {/* Render UserList: Kiểm tra kỹ userList có tồn tại không */}
                     <div className="max-h-40 overflow-y-auto pr-1 space-y-1 custom-scrollbar">
                         {userList && userList.length > 0 ? (
                             userList.map((u: any, idx: number) => (
-                                // u.name là tên user
                                 <MemberItem key={idx} name={u.name} />
                             ))
                         ) : (
@@ -220,7 +281,6 @@ const SidebarChatWindow = () => {
                 </div>
             )}
 
-            {/* --- MEDIA (FIX BUG CLICK VÀO ẢNH) --- */}
             <div className="p-4 border-b border-gray-100 dark:border-gray-800 flex-1">
                 <div className="flex items-center justify-between mb-3">
                     <h3 className="text-xs font-bold text-gray-400 uppercase tracking-wider">Ảnh đã chia sẻ</h3>
@@ -232,7 +292,7 @@ const SidebarChatWindow = () => {
                         {mediaImages.map((url, i) => (
                             <div
                                 key={i}
-                                onClick={() => setPreviewImage(url)} // BẤM VÀO ĐỂ MỞ MODAL XEM ẢNH
+                                onClick={() => setPreviewImage(url)}
                                 className="aspect-square bg-gray-200 dark:bg-gray-700 rounded-lg overflow-hidden cursor-pointer hover:opacity-80 transition-all border border-gray-200 dark:border-gray-700 active:scale-95"
                             >
                                 <img src={url} alt="media" className="w-full h-full object-cover" />
@@ -249,10 +309,8 @@ const SidebarChatWindow = () => {
                 )}
             </div>
 
-            {/* --- ACTIONS (FIX LOGIC BUTTON) --- */}
             <div className="p-4 mt-auto bg-gray-50 dark:bg-gray-800/50 border-t border-gray-100 dark:border-gray-800">
                 <div className="space-y-2">
-                    {/* Nút Ẩn Nhóm (Room) */}
                     {type === 'room' && (
                         <button
                             onClick={handleHideGroup}
@@ -265,7 +323,6 @@ const SidebarChatWindow = () => {
                         </button>
                     )}
 
-                    {/* Nút Chặn Người (People) */}
                     {type === 'people' && (
                         <button
                             onClick={handleBlockUser}
@@ -280,11 +337,10 @@ const SidebarChatWindow = () => {
                 </div>
             </div>
 
-            {/* --- MODAL XEM ẢNH FULL (LIGHTBOX) --- */}
             {previewImage && (
                 <div
                     className="fixed inset-0 z-[200] bg-black/90 flex items-center justify-center animate-in fade-in duration-200"
-                    onClick={() => setPreviewImage(null)} // Bấm ra ngoài để đóng
+                    onClick={() => setPreviewImage(null)}
                 >
                     <button
                         className="absolute top-4 right-4 text-white/70 hover:text-white p-2 rounded-full hover:bg-white/10"
@@ -296,12 +352,11 @@ const SidebarChatWindow = () => {
                         src={previewImage}
                         alt="Full Preview"
                         className="max-w-[90vw] max-h-[90vh] object-contain rounded-lg shadow-2xl animate-in zoom-in-95 duration-200"
-                        onClick={(e) => e.stopPropagation()} // Bấm vào ảnh không đóng
+                        onClick={(e) => e.stopPropagation()}
                     />
                 </div>
             )}
 
-            {/* --- MODAL XÁC NHẬN --- */}
             <ConfirmModal
                 isOpen={modalConfig.isOpen}
                 title={modalConfig.title}

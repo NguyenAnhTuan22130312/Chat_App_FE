@@ -85,16 +85,50 @@ export const listenForPinnedMessages = (currentUser: string, targetUser: string,
     return unsubscribe;
 };
 
-export const getAvatarFromFirebase = async (username: string): Promise<string | null> => {
-    const safeUsername = sanitizeFirebaseKey(username);
-    const userRef = ref(database, 'users/' + safeUsername + '/avatar');
+export const getAvatarFromFirebase = async (
+    name: string,
+    type: 'user' | 'group' | 'auto' = 'auto' // Mặc định là auto để tương thích code cũ, nhưng nên truyền rõ
+): Promise<string | null> => {
+    const safeName = sanitizeFirebaseKey(name);
+
+    // Log ra để kiểm tra xem key thực tế là gì (QUAN TRỌNG ĐỂ DEBUG)
+    console.log(`[GetAvatar] Đang tìm avatar cho: ${name} (SafeKey: ${safeName}) - Type: ${type}`);
+
     try {
-        const snapshot = await get(userRef);
-        if (snapshot.exists()) {
-            return snapshot.val();
+        // 1. Nếu type là 'user' hoặc 'auto', tìm trong users trước
+        if (type === 'user' || type === 'auto') {
+            const userRef = ref(database, 'users/' + safeName + '/avatar');
+            const userSnapshot = await get(userRef);
+
+            // Nếu tìm thấy và có dữ liệu
+            if (userSnapshot.exists() && userSnapshot.val()) {
+                console.log(`-> Tìm thấy trong Users:`, userSnapshot.val());
+                return userSnapshot.val();
+            }
         }
+
+        // 2. Nếu type là 'group' hoặc 'auto', tìm trong groups
+        // Lưu ý: Nếu type='auto' và ở trên tìm thấy User rỗng, nó vẫn chạy xuống đây (đã fix logic cũ)
+        if (type === 'group' || type === 'auto') {
+            const groupRef = ref(database, 'groups/' + safeName + '/avatar');
+            const groupSnapshot = await get(groupRef);
+
+            if (groupSnapshot.exists() && groupSnapshot.val()) {
+                console.log(`-> Tìm thấy trong Groups:`, groupSnapshot.val());
+                return groupSnapshot.val();
+            }
+        }
+
     } catch (error) {
-        console.error(error);
+        console.error("Lỗi lấy avatar:", error);
     }
+
+    console.warn(`-> Không tìm thấy avatar nào cho ${safeName}`);
     return null;
+};
+
+export const saveGroupAvatarToFirebase = (groupName: string, avatarUrl: string) => {
+    const safeGroupName = sanitizeFirebaseKey(groupName);
+    const groupRef = ref(database, 'groups/' + safeGroupName + '/avatar');
+    set(groupRef, avatarUrl).catch(err => console.error("Lỗi lưu Group Avatar:", err));
 };

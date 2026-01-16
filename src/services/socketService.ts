@@ -460,6 +460,8 @@ class SocketService {
         if (this.heartbeatInterval) clearInterval(this.heartbeatInterval);
         this.heartbeatInterval = setInterval(() => {
             if (this.socket?.readyState === WebSocket.OPEN) {
+                console.log('Sending PING');
+                this.send({ event: 'PING' });
             }
         }, HEARTBEAT_INTERVAL);
     }
