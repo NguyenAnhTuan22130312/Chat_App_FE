@@ -108,7 +108,6 @@ export default function MarkdownToolbar({ editorRef }: Props) {
         </div>
       </div>
 
-      {/* Color Picker Popup */}
       {showColorPicker && (
         <ColorPicker 
           onSelectColor={handleColorSelect}

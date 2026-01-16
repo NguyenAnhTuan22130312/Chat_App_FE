@@ -6,6 +6,7 @@ import { useAppSelector, useAppDispatch } from '../../hooks/reduxHooks';
 import { socketService } from '../../services/socketService';
 import { useUserAvatar } from '../../hooks/useUserAvatar';
 import { parseDate } from "../../utils/dateUtils";
+
 // import { setMessages } from '../../store/slices/chatSlice';
 import { useWebRTC } from '../../hooks/useWebRTC';
 import VideoCallModal from './VideoCallModal';
@@ -13,6 +14,7 @@ import PinnedMessageBar from './PinnedMessageBar';
 import { listenForReactions } from '../../services/firebaseConfig';
 import { updateAllReactions } from '../../store/slices/chatSlice';
 import SidebarChatWindow from './SidebarChatWindow'; 
+
 
 const GROUPING_THRESHOLD_MINUTES = 10;
 const SEPARATOR_THRESHOLD_HOURS = 1;
@@ -29,11 +31,11 @@ export default function ChatWindow() {
     }, [currentChatName, messagesByTarget]);
 
 
-    const messagesEndRef = useRef(null);
-    const scrollContainerRef = useRef(null);
-    const scrollHeightRef = useRef(0);
-    const lastMessageIdRef = useRef(null);
-    const loadSafetyTimerRef = useRef(null);
+    const messagesEndRef = useRef<HTMLDivElement>(null);
+    const scrollContainerRef = useRef<HTMLDivElement>(null);
+    const scrollHeightRef = useRef<number>(0);
+    const lastMessageIdRef = useRef<string | null>(null);
+    const loadSafetyTimerRef = useRef<NodeJS.Timeout | null>(null);
 
 
     const [page, setPage] = useState(1);
@@ -75,7 +77,8 @@ export default function ChatWindow() {
         }
     }, [currentChatName, currentChatType, isAuthenticated, dispatch]);
 
-    const handleScroll = (e) => {
+
+    const handleScroll = (e: React.UIEvent<HTMLDivElement>) => {
         const { scrollTop, scrollHeight } = e.currentTarget;
 
         if (scrollTop === 0 && hasMore && !isLoadingMore && messages.length > 0) {
@@ -147,6 +150,7 @@ export default function ChatWindow() {
         return () => unsubscribe();
     }, [currentChatName, currentChatType, user, dispatch]);
 
+
     if (!currentChatName) {
         return (
             <div className="flex flex-col h-screen bg-white dark:bg-gray-900 w-full border-l border-gray-300 dark:border-gray-700 items-center justify-center text-gray-400 dark:text-gray-500">
@@ -164,6 +168,7 @@ export default function ChatWindow() {
 
                 <ChatHeader onCallClick={startCall} />
                 <PinnedMessageBar />
+
                 <div
                     ref={scrollContainerRef}
                     onScroll={handleScroll}
@@ -231,7 +236,7 @@ export default function ChatWindow() {
 
                 <ChatInput />
 
-    
+
                 {(isCalling || isIncoming) && (
                     <VideoCallModal
                         localStream={localStream}

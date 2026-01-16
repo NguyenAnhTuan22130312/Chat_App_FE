@@ -15,7 +15,6 @@ export function useFirebaseLists(myUsername: string | null | undefined) {
         if (!myUsername) return;
         const safeMe = sanitizeFirebaseKey(myUsername);
 
-        // 1. Lắng nghe Friend List
         const friendsRef = ref(database, `users/${safeMe}/friends`);
         const unsubFriends = onValue(friendsRef, (snapshot) => {
             if (snapshot.exists()) {
@@ -25,7 +24,6 @@ export function useFirebaseLists(myUsername: string | null | undefined) {
             }
         });
 
-        // 2. Lắng nghe Group List
         const groupsRef = ref(database, `users/${safeMe}/groups`);
         const unsubGroups = onValue(groupsRef, (snapshot) => {
             if (snapshot.exists()) {
@@ -35,7 +33,6 @@ export function useFirebaseLists(myUsername: string | null | undefined) {
             }
         });
 
-        // 3. Lắng nghe Friend Requests
         const reqRef = ref(database, `users/${safeMe}/friendRequests`);
         const unsubReq = onValue(reqRef, (snapshot) => {
             if (snapshot.exists()) {
@@ -45,7 +42,6 @@ export function useFirebaseLists(myUsername: string | null | undefined) {
             }
         });
 
-        // 4. Lắng nghe Group Invites (Value ở đây là tên người mời)
         const invitesRef = ref(database, `users/${safeMe}/groupInvites`);
         const unsubInvites = onValue(invitesRef, (snapshot) => {
             if (snapshot.exists()) {
@@ -60,7 +56,6 @@ export function useFirebaseLists(myUsername: string | null | undefined) {
             }
         });
 
-        // 5. Lắng nghe Blocks
         const blockRef = ref(database, `users/${safeMe}/blocks`);
         const unsubBlock = onValue(blockRef, (snapshot) => {
             if (snapshot.exists()) {

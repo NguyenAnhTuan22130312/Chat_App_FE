@@ -177,7 +177,6 @@ export const saveChatImage = async (currentName: string, myUsername: string, typ
     const chatId = getChatId(currentName, myUsername, type);
     const mediaRef = ref(database, `chat_media/${chatId}`);
 
-    // Push tạo ra một key ngẫu nhiên (timestamp based)
     const newImageRef = push(mediaRef);
 
     await set(newImageRef, {
@@ -188,9 +187,6 @@ export const saveChatImage = async (currentName: string, myUsername: string, typ
     console.log("📸 Đã lưu ảnh vào Firebase Media");
 };
 
-/**
- * Hàm lắng nghe ảnh (Dùng trong useEffect của Component)
- */
 export const subscribeToChatImages = (
     currentName: string,
     myUsername: string,
@@ -203,7 +199,6 @@ export const subscribeToChatImages = (
     const unsubscribe = onValue(mediaRef, (snapshot) => {
         if (snapshot.exists()) {
             const data = snapshot.val();
-            // Chuyển object thành array và lấy field url, đảo ngược để ảnh mới nhất lên đầu
             const urls = Object.values(data).map((item: any) => item.url).reverse();
             callback(urls);
         } else {
@@ -211,5 +206,5 @@ export const subscribeToChatImages = (
         }
     });
 
-    return unsubscribe; // Trả về hàm hủy lắng nghe
+    return unsubscribe;
 };

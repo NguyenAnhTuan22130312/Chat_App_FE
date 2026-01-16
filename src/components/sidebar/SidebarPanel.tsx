@@ -53,7 +53,6 @@ const SearchResultCard = ({ targetUsername, exists, isFriend, isBlocked, isMe, o
     return null;
 };
 
-// --- MAIN COMPONENT ---
 
 const SidebarPanel = ({ onOpenCreateRoom }: { onOpenCreateRoom: () => void }) => {
     const dispatch = useAppDispatch();
@@ -61,29 +60,25 @@ const SidebarPanel = ({ onOpenCreateRoom }: { onOpenCreateRoom: () => void }) =>
     const { isSearching, searchResult, searchedUsername } = useAppSelector((state) => state.search);
     const currentUser = useAppSelector((state) => state.auth.user?.username || 'Guest');
 
-    // Redux State cho Join Room
+
     const { joinRoomStatus, joinRoomError } = useAppSelector((state) => state.ui);
 
     const { friends, blocks, groups, friendRequests, groupInvites, hiddenGroups } = useFirebaseLists(currentUser);
 
-    // Local States
     const [searchQuery, setSearchQuery] = useState('');
 
     const [showAddFriendModal, setShowAddFriendModal] = useState(false);
     const [targetFriendName, setTargetFriendName] = useState('');
     const [helloMessage, setHelloMessage] = useState('Chào bạn, mình muốn kết bạn với cậu!');
 
-    // State Modal Join Room
     const [showJoinRoomModal, setShowJoinRoomModal] = useState(false);
     const [joinRoomName, setJoinRoomName] = useState('');
 
-    // --- EFFECTS ---
     useEffect(() => {
         setSearchQuery('');
         dispatch(clearSearch());
     }, [activeTab, dispatch]);
 
-    // Effect lắng nghe kết quả Join Room để đóng modal
     useEffect(() => {
         if (joinRoomStatus === 'success') {
             setShowJoinRoomModal(false);
@@ -103,7 +98,6 @@ const SidebarPanel = ({ onOpenCreateRoom }: { onOpenCreateRoom: () => void }) =>
         }
     };
 
-    // --- Add Friend Logic ---
     const handleOpenAddModal = (name: string) => {
         setTargetFriendName(name);
         setHelloMessage(`Chào ${name}, mình muốn kết bạn với cậu!`);
@@ -121,9 +115,8 @@ const SidebarPanel = ({ onOpenCreateRoom }: { onOpenCreateRoom: () => void }) =>
         } catch (error) { alert("Lỗi: " + error); }
     };
 
-    // --- Join Room Logic ---
     const handleOpenJoinModal = () => {
-        dispatch(resetJoinRoomState()); // Xóa lỗi cũ trước khi mở
+        dispatch(resetJoinRoomState());
         setJoinRoomName('');
         setShowJoinRoomModal(true);
     };
@@ -137,7 +130,6 @@ const SidebarPanel = ({ onOpenCreateRoom }: { onOpenCreateRoom: () => void }) =>
 
     return (
         <div className="flex-1 flex flex-col bg-white dark:bg-gray-900 min-w-0 border-r border-gray-200 dark:border-gray-800 relative">
-            {/* Header */}
             <div className="h-16 px-4 flex items-center justify-between border-b border-gray-100 dark:border-gray-800 flex-shrink-0 gap-2">
                 <div className="flex-1 relative group">
                     <span className="absolute inset-y-0 left-0 flex items-center pl-3 text-gray-400"><svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" /></svg></span>
@@ -146,10 +138,9 @@ const SidebarPanel = ({ onOpenCreateRoom }: { onOpenCreateRoom: () => void }) =>
                 <button onClick={onOpenCreateRoom} className="p-2 text-gray-500 hover:bg-gray-100 dark:text-gray-400 dark:hover:bg-gray-700 rounded-lg"><svg className="h-6 w-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" /></svg></button>
             </div>
 
-            {/* List Content */}
+
             <div className="flex-1 overflow-y-auto px-1 pt-2">
                 {searchQuery ? (
-                    // ĐANG SEARCH
                     isSearching ? (
                         <div className="p-4 text-center text-gray-500 text-sm animate-pulse">Đang tìm kiếm...</div>
                     ) : searchedUsername ? (
@@ -167,12 +158,10 @@ const SidebarPanel = ({ onOpenCreateRoom }: { onOpenCreateRoom: () => void }) =>
                         </div>
                     )
                 ) : (
-                    // KHÔNG SEARCH -> HIỆN MENU CHÍNH
                     activeTab === 'contacts' ? (
                         <div className="px-4 space-y-2 pt-2 animate-in fade-in duration-300">
                             <p className="text-xs font-bold text-gray-400 uppercase mb-3 px-2">Danh bạ</p>
 
-                            {/* 1. Bạn bè */}
                             <ContactMenuItem
                                 onClick={() => dispatch(setActiveContactTab('friends'))}
                                 icon={<svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" /></svg>}
@@ -181,7 +170,6 @@ const SidebarPanel = ({ onOpenCreateRoom }: { onOpenCreateRoom: () => void }) =>
                                 color="bg-blue-500"
                             />
 
-                            {/* 2. Nhóm */}
                             <ContactMenuItem
                                 onClick={() => dispatch(setActiveContactTab('groups'))}
                                 icon={<svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" /></svg>}
@@ -190,7 +178,6 @@ const SidebarPanel = ({ onOpenCreateRoom }: { onOpenCreateRoom: () => void }) =>
                                 color="bg-green-500"
                             />
 
-                            {/* 3. MỤC MỚI: THAM GIA NHÓM */}
                             <ContactMenuItem
                                 onClick={handleOpenJoinModal}
                                 icon={
@@ -203,7 +190,6 @@ const SidebarPanel = ({ onOpenCreateRoom }: { onOpenCreateRoom: () => void }) =>
                                 color="bg-orange-500"
                             />
 
-                            {/* 4. Lời mời kết bạn */}
                             <ContactMenuItem
                                 onClick={() => dispatch(setActiveContactTab('friendRequests'))}
                                 icon={<svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M18 9v3m0 0v3m0-3h3m-3 0h-3m-2-5a4 4 0 11-8 0 4 4 0 018 0zM3 20a6 6 0 0112 0v1H3v-1z" /></svg>}
@@ -213,7 +199,6 @@ const SidebarPanel = ({ onOpenCreateRoom }: { onOpenCreateRoom: () => void }) =>
                                 color="bg-indigo-500"
                             />
 
-                            {/* 5. Lời mời vào nhóm */}
                             <ContactMenuItem
                                 onClick={() => dispatch(setActiveContactTab('groupInvites'))}
                                 icon={<svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9" /></svg>}
@@ -222,7 +207,6 @@ const SidebarPanel = ({ onOpenCreateRoom }: { onOpenCreateRoom: () => void }) =>
                                 color="bg-purple-500"
                             />
 
-                            {/* 6. Nhóm đã ẩn */}
                             <ContactMenuItem
                                 onClick={() => dispatch(setActiveContactTab('hiddenGroups'))}
                                 icon={<svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" /></svg>}
@@ -231,7 +215,6 @@ const SidebarPanel = ({ onOpenCreateRoom }: { onOpenCreateRoom: () => void }) =>
                                 color="bg-gray-500"
                             />
 
-                            {/* 7. Danh sách chặn */}
                             <ContactMenuItem
                                 onClick={() => dispatch(setActiveContactTab('blocks'))}
                                 icon={<svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M18.364 18.364A9 9 0 005.636 5.636m12.728 12.728A9 9 0 015.636 5.636m12.728 12.728L5.636 5.636" /></svg>}
@@ -244,7 +227,6 @@ const SidebarPanel = ({ onOpenCreateRoom }: { onOpenCreateRoom: () => void }) =>
                 )}
             </div>
 
-            {/* Modal Kết bạn */}
             {showAddFriendModal && (
                 <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-[100] animate-in fade-in duration-200">
                     <div className="bg-white dark:bg-gray-800 rounded-3xl p-6 w-[320px] shadow-2xl">
@@ -258,7 +240,6 @@ const SidebarPanel = ({ onOpenCreateRoom }: { onOpenCreateRoom: () => void }) =>
                 </div>
             )}
 
-            {/* MODAL JOIN ROOM (ĐÃ SỬA LỖI THẺ P) */}
             {showJoinRoomModal && (
                 <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-[100] animate-in fade-in duration-200">
                     <div className="bg-white dark:bg-gray-800 rounded-3xl p-6 w-[320px] shadow-2xl">
@@ -281,7 +262,6 @@ const SidebarPanel = ({ onOpenCreateRoom }: { onOpenCreateRoom: () => void }) =>
                             placeholder="Tên nhóm..."
                         />
 
-                        {/* HIỂN THỊ LỖI (Đã sửa lỗi đóng thẻ) */}
                         {joinRoomStatus === 'failed' && joinRoomError && (
                             <p className="text-xs text-red-500 mt-2 font-semibold flex items-center gap-1">
                                 <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
@@ -318,13 +298,11 @@ const SidebarPanel = ({ onOpenCreateRoom }: { onOpenCreateRoom: () => void }) =>
                     </div>
                 </div>
             )}
-            {/* HIỂN THỊ LỖI NẾU CÓ */}
             {joinRoomStatus === 'failed' && joinRoomError && (
                 <p className="text-xs text-red-500 mt-2 font-semibold flex items-center gap-1">
                     <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
                     </svg>
-                    {/* Nó sẽ hiện dòng: "Room not found" */}
                     {joinRoomError}
                 </p>
             )}

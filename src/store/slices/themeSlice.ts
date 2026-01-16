@@ -4,7 +4,6 @@ interface ThemeState {
   mode: 'light' | 'dark';
 }
 
-// Lấy theme từ localStorage or default = 'light'
 const initialState: ThemeState = {
   mode: (localStorage.getItem('theme') as 'light' | 'dark') || 'light',
 };

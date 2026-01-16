@@ -15,7 +15,6 @@ export default function EmojiStickerPicker({ onEmojiSelect, onGifSelect, onClose
 
   return (
     <div className="absolute bottom-16 right-0 z-50 bg-white dark:bg-gray-800 rounded-lg shadow-2xl border border-gray-200 dark:border-gray-700 w-96">
-      {/* Header with Tabs */}
       <div className="border-b border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-700">
         <div className="flex items-center justify-between px-3 pt-3 pb-2">
           <div className="flex-1 flex">
@@ -49,7 +48,6 @@ export default function EmojiStickerPicker({ onEmojiSelect, onGifSelect, onClose
         </div>
       </div>
 
-      {/* Content */}
       <div>
         {activeTab === 'sticker' ? (
           <GifPicker onSelect={onGifSelect} onClose={onClose} hideHeader />

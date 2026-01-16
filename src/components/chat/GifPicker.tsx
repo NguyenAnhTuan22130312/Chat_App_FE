@@ -134,7 +134,6 @@ export default function GifPicker({ onSelect, onClose, hideHeader = false }: Gif
 
   return (
     <div className="absolute bottom-16 right-0 z-50 bg-white dark:bg-gray-800 rounded-lg shadow-2xl border border-gray-200 dark:border-gray-700 w-96">
-      {/* Header */}
       <div className="p-3 border-b border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-700">
         <div className="flex justify-between items-center mb-2">
           <span className="text-sm font-medium text-gray-700 dark:text-gray-200">
@@ -147,8 +146,7 @@ export default function GifPicker({ onSelect, onClose, hideHeader = false }: Gif
             ×
           </button>
         </div>
-        
-        {/* Search Input */}
+
         <input
           type="text"
           placeholder="Tìm kiếm GIF..."
@@ -160,12 +158,10 @@ export default function GifPicker({ onSelect, onClose, hideHeader = false }: Gif
         />
       </div>
 
-      {/* GIF Grid */}
       <div className="p-3 max-h-96 overflow-y-auto">
         {gifGridContent}
       </div>
 
-      {/* Footer */}
       <div className="p-2 border-t border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-700 text-xs text-gray-500 dark:text-gray-400 text-center">
         Powered by{' '}
         <a 

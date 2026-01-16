@@ -42,7 +42,6 @@ export default function EmojiShortcodePicker({ onSelect, onClose, hideHeader = f
             </div>
           </div>
 
-          {/* Footer hint */}
           <div className="p-2 border-t border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-700 text-xs text-gray-500 dark:text-gray-400 text-center">
             Hoặc gõ trực tiếp: <code className="bg-gray-200 dark:bg-gray-600 dark:text-gray-200 px-1 rounded">:smile:</code>
           </div>

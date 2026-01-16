@@ -44,16 +44,12 @@ class SocketService {
 
 
     private whitelist: string[] = [];
-    private myGroupNames: Set<string> = new Set(); // Thêm cái này để biết ai là Room khi tự tạo list
+    private myGroupNames: Set<string> = new Set();
 
-    // 1. CẬP NHẬT HÀM SET WHITELIST
     public setWhitelist(friends: string[], groups: string[]) {
-        // Lưu lại danh sách tên nhóm để phân biệt type
         this.myGroupNames = new Set(groups);
 
-        // Gộp chung vào whitelist
         this.whitelist = Array.from(new Set([...friends, ...groups]));
-        console.log("🔒 Socket Whitelist Updated:", this.whitelist);
 
         if (this.socket && this.socket.readyState === WebSocket.OPEN) {
             this.getUserList();
@@ -159,7 +155,6 @@ class SocketService {
 
         const currentChatState = store.getState().currentChat;
         const myUsername = store.getState().auth.user?.username || localStorage.getItem('username');
-        console.log(`Socket Response [${event}]:`, status, payload);
         if (status === 'success') {
             switch (event) {
                 case 'LOGIN':
@@ -252,7 +247,6 @@ class SocketService {
                             }));
                         }
                         if (responseData.userList && Array.isArray(responseData.userList)) {
-                            console.log("👥 Cập nhật thành viên nhóm:", responseData.userList);
                             store.dispatch(setRoomMembers(responseData.userList));
                         }
                     }
@@ -316,31 +310,22 @@ class SocketService {
                     if (Array.isArray(responseData)) {
                         let partnersToProcess: ChatPartner[] = [];
 
-                        // --- LOGIC MỚI Ở ĐÂY ---
                         if (USE_FIREBASE_SOURCE) {
-                            // CASE TRUE: Dùng Whitelist làm gốc (Bỏ qua việc server có trả về hay không)
-                            // Ta tự tạo Object ChatPartner từ whitelist
                             partnersToProcess = this.whitelist.map(name => {
-                                // Cố gắng tìm thông tin từ server trả về để lấy actionTime (nếu có)
                                 const serverData = responseData.find((u: any) => u.name === name);
 
-                                // Xác định type: Kiểm tra trong set myGroupNames
                                 const isGroup = this.myGroupNames.has(name);
 
                                 return {
                                     name: name,
-                                    // Nếu là group thì type room, ngược lại people
                                     type: isGroup ? 'room' : 'people',
-                                    // Nếu server có trả về time thì lấy, ko thì lấy giờ hiện tại để đẩy lên đầu
                                     actionTime: serverData?.actionTime || new Date().toISOString(),
-                                    isOnline: false, // Mặc định false, sẽ check sau
+                                    isOnline: false,
                                 };
                             });
 
-                            console.log("🛡️ Chế độ Firebase Source: Đã tạo danh sách từ Whitelist:", partnersToProcess.length);
 
                         } else {
-                            // CASE FALSE: Dùng Server làm gốc -> Rồi lọc (Logic cũ)
                             let allPartners: ChatPartner[] = responseData.map((item: any) => ({
                                 name: item.name,
                                 type: (item.type === 1 ? 'room' : 'people') as 'room' | 'people',
@@ -354,10 +339,6 @@ class SocketService {
                                 partnersToProcess = allPartners.filter(p => this.whitelist.includes(p.name));
                             }
                         }
-
-                        // --- PHẦN DƯỚI GIỮ NGUYÊN ---
-
-                        // Sắp xếp
                         partnersToProcess.sort((a, b) => {
                             if (!a.actionTime || !b.actionTime) return 0;
                             return new Date(b.actionTime).getTime() - new Date(a.actionTime).getTime();
@@ -391,7 +372,6 @@ class SocketService {
                     }
                     break;
                 case 'CREATE_ROOM':
-                    // Check status success từ server
                     if (status === 'success' && responseData) {
                         const newRoomName = responseData.name;
                         const myUsername = store.getState().auth.user?.username;
