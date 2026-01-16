@@ -127,13 +127,20 @@ const ChatListItem = ({ partner, isActive, onClick }: any) => {
             }`}
         >
             <div className="relative shrink-0">
-                {partner.type === 'people' ? (
-                    <img src={avatar} className={`w-12 h-12 rounded-full object-cover border-2 ${isActive ? 'border-white/20' : 'border-transparent'}`} alt="" />
-                ) : (
-                    <div className={`w-12 h-12 rounded-full flex items-center justify-center font-bold text-lg ${isActive ? 'bg-white/20 text-white' : 'bg-indigo-100 text-indigo-600 dark:bg-indigo-900/50'}`}>
-                        {partner.name.charAt(0).toUpperCase()}
-                    </div>
-                )}
+                {/*{partner.type === 'people' ? (*/}
+                {/*    <img src={avatar} className={`w-12 h-12 rounded-full object-cover border-2 ${isActive ? 'border-white/20' : 'border-transparent'}`} alt="" />*/}
+                {/*) : (*/}
+                {/*    <div className={`w-12 h-12 rounded-full flex items-center justify-center font-bold text-lg ${isActive ? 'bg-white/20 text-white' : 'bg-indigo-100 text-indigo-600 dark:bg-indigo-900/50'}`}>*/}
+                {/*        {partner.name.charAt(0).toUpperCase()}*/}
+                {/*    </div>*/}
+                {/*)}*/}
+
+                <img
+                    src={avatar}
+                    className={`w-12 h-12 rounded-full object-cover border-2 ${isActive ? 'border-white/20' : 'border-transparent'}`}
+                    alt={partner.name}
+                />
+
                 {partner.type === 'people' && (
                     <div className={`absolute bottom-0 right-0 w-3.5 h-3.5 rounded-full border-2 ${isActive ? 'border-blue-600' : 'border-white dark:border-gray-900'} ${partner.isOnline ? 'bg-green-500' : 'bg-gray-400'}`} />
                 )}
