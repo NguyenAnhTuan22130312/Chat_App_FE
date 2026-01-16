@@ -8,7 +8,8 @@ import RichTextInput from './RichTextInput';
 import ReplyPreview from './ReplyPreview';
 import { formatReplyMessage } from '../../utils/replyUtils';
 import { clearReplyingTo } from '../../store/slices/uiSlice';
-import { useUserAvatar } from '../../hooks/useUserAvatar'; // Giả sử bạn có hook này để lấy avatar
+import { useUserAvatar } from '../../hooks/useUserAvatar';
+import {saveChatImage} from "../../services/friendService"; // Giả sử bạn có hook này để lấy avatar
 
 const CLOUD_NAME = "dox9vbxjn";
 const UPLOAD_PRESET = "chat_app_preset";
@@ -141,27 +142,6 @@ export default function ChatInput() {
             setShowMentionList(false);
         }
     };
-
-    // // 2. HÀM CHECK KÝ TỰ @ KHI NHẬP LIỆU
-    // const handleContentChange = (newText: string) => {
-    //     setText(newText);
-    //     const inputElement = inputRef.current as any;
-    //     if (!inputElement) return;
-    //
-    //     const selectionStart = inputElement.selectionStart || newText.length;
-    //
-    //     const textBeforeCursor = newText.slice(0, selectionStart);
-    //
-    //     const match = textBeforeCursor.match(/(^|\s)@([a-zA-Z0-9_]*)$/);
-    //
-    //     if (match) {
-    //         const query = match[2];
-    //         setMentionQuery(query);
-    //         setShowMentionList(true);
-    //     } else {
-    //         setShowMentionList(false);
-    //     }
-    // };
 
     const handleSelectUser = (username: string) => {
         const inputElement = inputRef.current;
@@ -370,7 +350,15 @@ export default function ChatInput() {
                 method: 'POST', body: formData,
             });
             const data = await response.json();
-            if (data.secure_url) sendMessage(data.secure_url);
+            if (data.secure_url) {
+                // 1. Gửi qua Socket (Hiển thị ngay trong chat)
+                sendMessage(data.secure_url);
+
+                // 2. LƯU VÀO FIREBASE (Để hiện bên Sidebar) --- THÊM ĐOẠN NÀY
+                if (user?.username && currentName && currentType) {
+                    saveChatImage(currentName, user.username, currentType, data.secure_url);
+                }
+            }
             else alert("Lỗi upload ảnh");
         } catch (error) {
             alert("Không thể kết nối tới Cloudinary!");

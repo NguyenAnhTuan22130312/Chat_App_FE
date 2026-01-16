@@ -8,7 +8,9 @@ import {
     blockUser,
     unblockUser,
     hideGroup,
-    unhideGroup
+    unhideGroup,
+    acceptGroupInvite,
+    rejectGroupInvite
 } from '../../services/friendService';
 import { socketService } from '../../services/socketService';
 import ConfirmModal from '../common/ConfirmModal'; // Import Modal mới
@@ -61,6 +63,26 @@ const ContactWindow = () => {
                 closeModal();
             }
         });
+    };
+
+    const handleAcceptGroup = async (groupName: string) => {
+        if (!currentUser) return;
+        try {
+            await acceptGroupInvite(currentUser, groupName);
+             socketService.joinRoom(groupName);
+        } catch (error: any) {
+            alert(error.message);
+        }
+    };
+
+    const handleRejectGroup = (groupName: string) => {
+        if (!currentUser) return;
+        openConfirm(
+            "Từ chối tham gia nhóm?",
+            `Bạn có chắc muốn từ chối lời mời vào nhóm ${groupName}?`,
+            () => rejectGroupInvite(currentUser, groupName),
+            true // Nút màu đỏ
+        );
     };
 
     // --- CÁC HÀM XỬ LÝ HÀNH ĐỘNG (Dùng openConfirm thay vì window.confirm) ---
@@ -151,6 +173,35 @@ const ContactWindow = () => {
                                               <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13.875 18.825A10.05 10.05 0 0112 19c-4.478 0-8.268-2.943-9.543-7a9.97 9.97 0 011.563-3.029m5.858.908a3 3 0 114.243 4.243M9.878 9.878l4.242 4.242M9.88 9.88l-3.29-3.29m7.532 7.532l3.29 3.29M3 3l3.59 3.59m0 0A9.953 9.953 0 0112 5c4.478 0 8.268 2.943 9.543 7a10.025 10.025 0 01-4.132 5.411m0 0L21 21" /></svg> Ẩn
                                           </button>
                                       }
+                            />
+                        ))}
+                    </div>
+                );
+            case 'groupInvites':
+                if (groupInvites.length === 0) return <EmptyState text="Không có lời mời vào nhóm nào." />;
+                return (
+                    <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+                        {groupInvites.map((invite: any) => (
+                            <UserCard
+                                key={invite.group}
+                                username={invite.group} // Hiển thị Tên Nhóm
+                                subText={`Người mời: ${invite.inviter}`} // Hiển thị người mời
+                                actions={
+                                    <>
+                                        <button
+                                            onClick={() => handleRejectGroup(invite.group)}
+                                            className="px-3 py-2 text-gray-500 hover:bg-gray-100 dark:text-gray-400 dark:hover:bg-gray-700 rounded-xl text-sm font-semibold transition-colors"
+                                        >
+                                            Từ chối
+                                        </button>
+                                        <button
+                                            onClick={() => handleAcceptGroup(invite.group)}
+                                            className="px-4 py-2 bg-blue-600 text-white hover:bg-blue-700 rounded-xl text-sm font-semibold shadow-md shadow-blue-500/20 transition-colors"
+                                        >
+                                            Tham gia
+                                        </button>
+                                    </>
+                                }
                             />
                         ))}
                     </div>
