@@ -2,7 +2,7 @@ import React, { memo } from 'react';
 import MessageBubble from './MessageBubble';
 import { useUserAvatar } from '../../hooks/useUserAvatar';
 import { useAppDispatch, useAppSelector } from '../../hooks/reduxHooks';
-import { savePinnedMessageToFirebase } from '../../services/firebaseConfig';
+import { savePinnedMessageToFirebase , toggleReactionToFirebase} from '../../services/firebaseConfig';
 import { formatMessageTime, formatSeparatorTime } from '../../utils/dateUtils';
 import { setReplyingTo } from '../../store/slices/uiSlice';
 
@@ -16,7 +16,7 @@ const MessageItem = memo(({
                               partnerAvatarFallback
                           }: any) => {
 
-    const { name: currentChatName } = useAppSelector(state => state.currentChat);
+                            const { name: currentChatName, type: currentChatType } = useAppSelector(state => state.currentChat);
     const { user } = useAppSelector(state => state.auth);
     const dispatch = useAppDispatch();
 
@@ -36,6 +36,18 @@ const MessageItem = memo(({
                 target: currentChatName,
                 message: msg,
             }));
+        }
+    };
+
+    const handleReaction = (emoji: string) => {
+        if (currentChatName && user?.username && currentChatType) {
+            toggleReactionToFirebase(
+                user.username,
+                currentChatName,
+                currentChatType,
+                msg,
+                emoji
+            );
         }
     };
 
@@ -74,6 +86,9 @@ const MessageItem = memo(({
                         replyTo={msg.replyTo}
                         onReply={handleReply}
                         onPin={handlePin}
+                        reactions={msg.reactions}
+                        currentUsername={user?.username}
+                        onReaction={handleReaction}
                     />
                 </div>
             </div>

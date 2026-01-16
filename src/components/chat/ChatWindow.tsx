@@ -6,10 +6,15 @@ import { useAppSelector, useAppDispatch } from '../../hooks/reduxHooks';
 import { socketService } from '../../services/socketService';
 import { useUserAvatar } from '../../hooks/useUserAvatar';
 import { parseDate } from "../../utils/dateUtils";
+
+// import { setMessages } from '../../store/slices/chatSlice';
 import { useWebRTC } from '../../hooks/useWebRTC';
 import VideoCallModal from './VideoCallModal';
 import PinnedMessageBar from './PinnedMessageBar';
-import SidebarChatWindow from './SidebarChatWindow';
+import { listenForReactions } from '../../services/firebaseConfig';
+import { updateAllReactions } from '../../store/slices/chatSlice';
+import SidebarChatWindow from './SidebarChatWindow'; 
+
 
 const GROUPING_THRESHOLD_MINUTES = 10;
 const SEPARATOR_THRESHOLD_HOURS = 1;
@@ -24,6 +29,7 @@ export default function ChatWindow() {
     const messages = useMemo(() => {
         return currentChatName ? (messagesByTarget[currentChatName] || []) : [];
     }, [currentChatName, messagesByTarget]);
+
 
     const messagesEndRef = useRef<HTMLDivElement>(null);
     const scrollContainerRef = useRef<HTMLDivElement>(null);
@@ -70,6 +76,7 @@ export default function ChatWindow() {
             };
         }
     }, [currentChatName, currentChatType, isAuthenticated, dispatch]);
+
 
     const handleScroll = (e: React.UIEvent<HTMLDivElement>) => {
         const { scrollTop, scrollHeight } = e.currentTarget;
@@ -125,6 +132,23 @@ export default function ChatWindow() {
             lastMessageIdRef.current = lastMsgId;
         }
     }, [messages, isLoadingMore]);
+    useEffect(() => {
+        if (!currentChatName || !user?.username || !currentChatType) return;
+
+        const unsubscribe = listenForReactions(
+            user.username,
+            currentChatName,
+            currentChatType,
+            (data) => {
+                dispatch(updateAllReactions({
+                    target: currentChatName,
+                    reactionsData: data
+                }));
+            }
+        );
+
+        return () => unsubscribe();
+    }, [currentChatName, currentChatType, user, dispatch]);
 
 
     if (!currentChatName) {
@@ -137,6 +161,7 @@ export default function ChatWindow() {
     }
 
     return (
+
         <div className="flex h-screen bg-white dark:bg-gray-900 w-full">
 
             <div className="flex-1 flex flex-col min-w-0 border-l border-gray-300 dark:border-gray-700 relative h-full">
@@ -210,6 +235,7 @@ export default function ChatWindow() {
                 </div>
 
                 <ChatInput />
+
 
                 {(isCalling || isIncoming) && (
                     <VideoCallModal
